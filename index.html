@@ -264,7 +264,7 @@ tbody tr:last-child td{border-bottom:none}
     <div id="page-all" class="page" style="display:none">
       <div class="panel">
         <div class="panel-header"><h2>全部SKU库存</h2><button class="btn btn-outline btn-sm" onclick="loadCloudData()">🔄 刷新</button></div>
-        <div class="table-wrap"><table><thead><tr><th>大类</th><th>SKU</th><th class="text-right">采购单价</th><th class="text-right">库存量</th><th class="text-right">库存价值</th><th class="text-center">状态</th><th>存放</th></tr></thead><tbody id="allBody"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>大类</th><th>SKU</th><th class="text-right">采购单价</th><th class="text-right">库存量</th><th class="text-right">库存价值</th><th class="text-center">状态</th><th>世代</th></tr></thead><tbody id="allBody"></tbody></table></div>
       </div>
     </div>
 
@@ -326,7 +326,7 @@ tbody tr:last-child td{border-bottom:none}
     <div id="page-alert" class="page" style="display:none">
       <div class="panel">
         <div class="panel-header"><h2>库存预警</h2><button class="btn btn-outline btn-sm" onclick="renderAlert()">🔄 刷新</button></div>
-        <div class="table-wrap"><table><thead><tr><th>大类</th><th>SKU</th><th class="text-right">当前库存</th><th class="text-right">安全库存</th><th class="text-right">缺口</th><th class="text-center">状态</th><th>存放</th></tr></thead><tbody id="alertBody"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>大类</th><th>SKU</th><th class="text-right">当前库存</th><th class="text-right">安全库存</th><th class="text-right">缺口</th><th class="text-center">状态</th><th>世代</th></tr></thead><tbody id="alertBody"></tbody></table></div>
       </div>
     </div>
   </main>
@@ -339,12 +339,12 @@ tbody tr:last-child td{border-bottom:none}
     <div class="modal-body">
       <div class="form-group"><label>大类名称 <span class="req">*</span></label><input type="text" id="cName" placeholder="如：奔跑四"></div>
       <div class="form-row-3">
-        <div class="form-group"><label>存放位置</label><select id="cLocation"><option value="">— 请选择 —</option></select></div>
+        <div class="form-group"><label>SKU选择</label><select id="cLocation"><option value="">— 请选择 —</option></select></div>
         <div class="form-group"><label>采购单价（元）</label><input type="number" id="cPurchasePrice" step="0.01" min="0" placeholder="0.00"></div>
         <div class="form-group"><label>安全库存阈值</label><input type="number" id="cSafetyStock" min="0" value="10"></div>
       </div>
       <div class="form-group"><label>备注</label><textarea id="cNotes" placeholder="商品描述、规格等"></textarea></div>
-      <div style="font-size:12px;color:var(--muted)">保存后会自动生成16个SKU小类：家族款、王橹杰、杨博文……</div>
+      <div style="font-size:12px;color:var(--muted)">选择「四代」自动生成16个SKU；选择「五代」目前只生成家族款</div>
     </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('categoryModal')">取消</button><button class="btn btn-primary" onclick="saveCategory()">保存</button></div>
   </div>
@@ -418,7 +418,10 @@ tbody tr:last-child td{border-bottom:none}
 
 <script>
 const SKU_OPTIONS=['家族款','王橹杰','杨博文','张桂源','陈浚铭','左奇函','张函瑞','陈奕恒','陈思罕','张奕然','李煜东','杨涵博','魏子宸','官俊臣','王烁然','聂玮辰'];
-const LOCATION_OPTIONS=['11','笋笋','小碗','其他'];
+const SKU_GROUPS={
+  '四代':['家族款','王橹杰','杨博文','张桂源','陈浚铭','左奇函','张函瑞','陈奕恒','陈思罕','张奕然','李煜东','杨涵博','魏子宸','官俊臣','王烁然','聂玮辰'],
+  '五代':['家族款']
+};
 const OPERATOR_OPTIONS=['11','笋笋','小碗'];
 
 const SUPABASE_URL='https://bjfjlzwbbwhlkmaiqqoh.supabase.co';
@@ -580,7 +583,7 @@ function renderCategoryDetail(cat){
   const p=items[0];
   const total=items.reduce((s,i)=>s+calcStock(i.id),0);
   const totalValue=items.reduce((s,i)=>s+calcStock(i.id)*(i.purchasePrice||0),0);
-  document.getElementById('categoryDetailHeader').innerHTML=`<button class="cd-back" onclick="navTo('home')" title="返回">‹</button><div class="cd-name">${escapeHtml(cat)}</div><div class="cd-meta">总库存：${fmt(total)} 件 | 库存价值：${fmtMoney(totalValue)} | 存放：${escapeHtml(p.location)||'—'}</div>`;
+  document.getElementById('categoryDetailHeader').innerHTML=`<button class="cd-back" onclick="navTo('home')" title="返回">‹</button><div class="cd-name">${escapeHtml(cat)}</div><div class="cd-meta">总库存：${fmt(total)} 件 | 库存价值：${fmtMoney(totalValue)} | 世代：${escapeHtml(p.location)||'—'}</div>`;
   document.getElementById('categoryDetailGrid').innerHTML=items.map(p=>{
     const stock=calcStock(p.id);const status=getStatus(p);
     const color=status==='out'?'#c88787':status==='low'?'#e5a85e':'#5ac4b4';
@@ -624,7 +627,7 @@ async function openPriceModal(pid){
 // 大类 Modal
 function openCategoryModal(){
   document.getElementById('cName').value='';
-  const locSel=document.getElementById('cLocation');locSel.innerHTML='<option value="">— 请选择 —</option>'+LOCATION_OPTIONS.map(l=>`<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join('');
+  const locSel=document.getElementById('cLocation');locSel.innerHTML='<option value="">— 请选择 —</option>'+Object.keys(SKU_GROUPS).map(g=>`<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('');
   document.getElementById('cPurchasePrice').value='';
   document.getElementById('cSafetyStock').value=10;
   document.getElementById('cNotes').value='';
@@ -635,19 +638,21 @@ async function saveCategory(){
   const category=document.getElementById('cName').value.trim();
   if(!category){toast('请填写大类名称','error');return;}
   if(getCategories().includes(category)){toast(`大类「${category}」已存在`,'error');return;}
-  isLoading=true;toast('正在创建大类...');
   const location=document.getElementById('cLocation').value;
+  if(!location){toast('请选择SKU系列','error');return;}
+  const skuList=SKU_GROUPS[location]||[];
+  if(skuList.length===0){toast('该系列暂无SKU','error');return;}
+  isLoading=true;toast('正在创建大类...');
   const purchasePrice=parseFloat(document.getElementById('cPurchasePrice').value)||0;
   const safetyStock=parseInt(document.getElementById('cSafetyStock').value)||0;
   const notes=document.getElementById('cNotes').value.trim();
   try{
-    // 自动生成16个SKU
-    for(const sku of SKU_OPTIONS){
+    for(const sku of skuList){
       await Cloud.insertProduct({id:uid(),name:category+'-'+sku,sku,category,location,purchasePrice,safetyStock,notes,createdAt:Date.now()});
     }
     closeModal('categoryModal');
     await loadCloudData();
-    toast(`大类「${category}」已创建，自动生成16个SKU`,'success');
+    toast(`大类「${category}」已创建，${location}共${skuList.length}个SKU`,'success');
   }catch(e){toast('创建失败，请重试','error');console.error(e);}
   isLoading=false;
 }
@@ -822,7 +827,7 @@ async function importData(e){
 async function exportExcel(){
   if(typeof XLSX==='undefined'){toast('Excel组件加载中，请稍后重试','error');return;}
   const wb=XLSX.utils.book_new();
-  const stockRows=state.products.map(p=>{const stock=calcStock(p.id);const status=stock<=0?'缺货':stock<=(p.safetyStock||0)?'库存偏低':'正常';return{大类:p.category||'',SKU:p.sku||'',采购单价:p.purchasePrice||0,库存量:stock,库存价值:stock*(p.purchasePrice||0),安全库存:p.safetyStock||0,状态:status,存放位置:p.location||''};});
+  const stockRows=state.products.map(p=>{const stock=calcStock(p.id);const status=stock<=0?'缺货':stock<=(p.safetyStock||0)?'库存偏低':'正常';return{大类:p.category||'',SKU:p.sku||'',采购单价:p.purchasePrice||0,库存量:stock,库存价值:stock*(p.purchasePrice||0),安全库存:p.safetyStock||0,状态:status,世代:p.location||''};});
   const ws1=XLSX.utils.json_to_sheet(stockRows);
   ws1['!cols']=[{wch:12},{wch:12},{wch:10},{wch:8},{wch:10},{wch:8},{wch:8},{wch:10}];
   XLSX.utils.book_append_sheet(wb,ws1,'SKU库存清单');
