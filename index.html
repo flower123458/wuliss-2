@@ -46,6 +46,11 @@ header{background:linear-gradient(135deg,#ffc9ca 0%,#ffe8e8 100%);color:#6b4c5a;
 .sidebar-search{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none}
 .sidebar-search:focus{border-color:var(--primary)}
 .nav-section-title{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:10px 16px 4px;font-weight:600}
+.nav-section-title.collapsible{cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none}
+.nav-section-title.collapsible:hover{color:var(--primary)}
+.toggle-arrow{transition:transform .2s;font-size:11px;margin-left:4px}
+.nav-section-title.collapsed .toggle-arrow{transform:rotate(-90deg)}
+#catNavList.collapsed{display:none}
 .nav-item{display:flex;align-items:center;gap:8px;padding:8px 16px;cursor:pointer;color:var(--text);font-size:13px;transition:all .15s;border-left:3px solid transparent}
 .nav-item:hover{background:var(--primary-light);color:var(--primary)}
 .nav-item.active{background:var(--primary-light);color:var(--primary);border-left-color:var(--primary);font-weight:500}
@@ -238,7 +243,7 @@ tbody tr:last-child td{border-bottom:none}
     <div class="nav-item" data-nav="inbound" onclick="navTo('inbound')"><span class="icon">📥</span><span>入库记录</span><span class="badge" id="nav-inbound">0</span></div>
     <div class="nav-item" data-nav="outbound" onclick="navTo('outbound')"><span class="icon">📤</span><span>出库记录</span><span class="badge" id="nav-outbound">0</span></div>
     <div class="nav-item" data-nav="alert" onclick="navTo('alert')"><span class="icon">⚠️</span><span>库存预警</span><span class="badge" id="nav-alert">0</span></div>
-    <div class="nav-section-title">商品大类</div>
+    <div class="nav-section-title collapsible" onclick="toggleCatNav()" title="展开 / 收起">商品大类 <span class="toggle-arrow" id="catNavArrow">▾</span></div>
     <div id="catNavList"></div>
     <div class="nav-section-title">快捷操作</div>
     <div class="nav-item" onclick="openInboundModal()"><span class="icon">📥</span><span>新增入库</span></div>
@@ -514,6 +519,24 @@ function renderCatNav(){
       <span class="cstock ${cls}">${fmt(total)}</span>
     </div>`;
   }).join('');
+}
+
+function toggleCatNav(){
+  const list=document.getElementById('catNavList');
+  const title=document.querySelector('.nav-section-title.collapsible');
+  const collapsed=list.classList.toggle('collapsed');
+  title.classList.toggle('collapsed',collapsed);
+  try{localStorage.setItem('catNavCollapsed',collapsed?'1':'0');}catch(e){}
+}
+
+function applyCatNavCollapsedState(){
+  try{
+    if(localStorage.getItem('catNavCollapsed')==='1'){
+      document.getElementById('catNavList').classList.add('collapsed');
+      const t=document.querySelector('.nav-section-title.collapsible');
+      if(t)t.classList.add('collapsed');
+    }
+  }catch(e){}
 }
 
 async function loadCloudData(){
@@ -943,6 +966,7 @@ function logout(){
 }
 
 function initApp(){
+  applyCatNavCollapsedState();
   renderStatsBar();renderCatNav();renderHome();
   loadCloudData();
   setInterval(()=>{loadCloudData();},30000);
