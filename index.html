@@ -281,6 +281,16 @@ tbody tr:last-child td{border-bottom:none}
       </div>
     </div>
 
+    <!-- 到货表页 -->
+    <div id="page-expected" class="page" style="display:none">
+      <div class="category-detail-header" id="expectedHeader"></div>
+      <div class="panel">
+        <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center"><h2>📋 应到 / 实到 / 已出</h2><span style="font-size:12px;color:var(--muted)">应到数量可直接修改</span></div>
+        <div class="table-wrap"><table><thead><tr><th>SKU</th><th class="text-right">应到</th><th class="text-right">实到</th><th class="text-right">已出</th><th class="text-right">当前库存</th></tr></thead><tbody id="expectedBody"></tbody></table></div>
+        <div style="padding:12px 16px;text-align:center"><button class="btn btn-primary" onclick="saveExpectedQty()">保存应到数量</button></div>
+      </div>
+    </div>
+
     <!-- 入库记录页 -->
     <div id="page-inbound" class="page" style="display:none">
       <div class="panel">
@@ -437,8 +447,9 @@ const Cloud={
     ]);
     return {products:await pRes.json()||[],transactions:await tRes.json()||[]};
   },
-  async insertProduct(p){return fetch(API_BASE+'/products_v2',{method:'POST',headers:API_HEADERS,body:JSON.stringify({id:p.id,name:p.name,sku:p.sku,category:p.category,location:p.location,purchase_price:p.purchasePrice||0,safety_stock:p.safetyStock||0,notes:p.notes,created_at:p.createdAt})}).then(r=>r.json());},
-  async updateProduct(id,data){return fetch(API_BASE+'/products_v2?id=eq.'+id,{method:'PATCH',headers:API_HEADERS,body:JSON.stringify({name:data.name,sku:data.sku,category:data.category,location:data.location,purchase_price:data.purchasePrice||0,safety_stock:data.safetyStock||0,notes:data.notes})}).then(r=>r.json());},
+  async insertProduct(p){return fetch(API_BASE+'/products_v2',{method:'POST',headers:API_HEADERS,body:JSON.stringify({id:p.id,name:p.name,sku:p.sku,category:p.category,location:p.location,purchase_price:p.purchasePrice||0,safety_stock:p.safetyStock||0,expected_qty:p.expectedQty||0,notes:p.notes,created_at:p.createdAt})}).then(r=>r.json());},
+  async updateProduct(id,data){return fetch(API_BASE+'/products_v2?id=eq.'+id,{method:'PATCH',headers:API_HEADERS,body:JSON.stringify({name:data.name,sku:data.sku,category:data.category,location:data.location,purchase_price:data.purchasePrice||0,safety_stock:data.safetyStock||0,expected_qty:data.expectedQty||0,notes:data.notes})}).then(r=>r.json());},
+  async updateExpectedQty(id,qty){const r=await fetch(API_BASE+'/products_v2?id=eq.'+id,{method:'PATCH',headers:API_HEADERS,body:JSON.stringify({expected_qty:qty})});if(!r.ok){const t=await r.text();throw new Error(t);}return r.json();},
   async deleteProduct(id){await fetch(API_BASE+'/products_v2?id=eq.'+id,{method:'DELETE',headers:API_HEADERS});},
   async insertTransaction(t){return fetch(API_BASE+'/transactions_v2',{method:'POST',headers:API_HEADERS,body:JSON.stringify({id:t.id,type:t.type,product_id:t.productId,qty:t.qty,price:t.price||0,date:t.date,operator:t.operator||'',purchase_date:t.purchaseDate||'',sales_channel:t.salesChannel||'',notes:t.notes,created_at:t.createdAt})}).then(r=>r.json());},
   async deleteTransaction(id){await fetch(API_BASE+'/transactions_v2?id=eq.'+id,{method:'DELETE',headers:API_HEADERS});},
@@ -475,8 +486,9 @@ function navTo(page,cat){
   if(page==='all')renderAll();
   if(page==='inbound')renderInbound();
   if(page==='outbound')renderOutbound();
-  if(page==='alert')renderAlert();
-  if(page==='category-detail'){currentCategory=cat;renderCategoryDetail(cat);}
+    if(page==='alert')renderAlert();
+    if(page==='category-detail'){currentCategory=cat;renderCategoryDetail(cat);}
+    if(page==='expected')renderExpected();
   if(window.innerWidth<=768){document.getElementById('sidebar').classList.remove('mobile-show');document.getElementById('overlay').classList.remove('show');}
 }
 function navToCategory(cat){navTo('category-detail',cat);}
@@ -508,7 +520,7 @@ async function loadCloudData(){
   if(isLoading)return;isLoading=true;document.getElementById('loadingOverlay').style.display='block';
   try{
     const data=await Cloud.loadAll();
-    state.products=data.products.map(p=>({id:p.id,name:p.name,sku:p.sku,category:p.category,location:p.location,purchasePrice:parseFloat(p.purchase_price)||0,safetyStock:p.safety_stock||0,notes:p.notes,createdAt:p.created_at}));
+    state.products=data.products.map(p=>({id:p.id,name:p.name,sku:p.sku,category:p.category,location:p.location,purchasePrice:parseFloat(p.purchase_price)||0,safetyStock:p.safety_stock||0,expectedQty:parseInt(p.expected_qty)||0,notes:p.notes,createdAt:p.created_at}));
     state.transactions=data.transactions.map(t=>({id:t.id,type:t.type,productId:t.product_id,qty:t.qty,price:parseFloat(t.price)||0,date:t.date,operator:t.operator,purchaseDate:t.purchase_date,salesChannel:t.sales_channel,notes:t.notes,createdAt:t.created_at}));
     refresh();
   }catch(e){console.error(e);toast('加载数据失败，请检查网络','error');}
@@ -583,7 +595,7 @@ function renderCategoryDetail(cat){
   const p=items[0];
   const total=items.reduce((s,i)=>s+calcStock(i.id),0);
   const totalValue=items.reduce((s,i)=>s+calcStock(i.id)*(i.purchasePrice||0),0);
-  document.getElementById('categoryDetailHeader').innerHTML=`<button class="cd-back" onclick="navTo('home')" title="返回">‹</button><div class="cd-name">${escapeHtml(cat)}</div><div class="cd-meta">总库存：${fmt(total)} 件 | 库存价值：${fmtMoney(totalValue)} | 分类：${escapeHtml(p.location)||'—'}</div>`;
+  document.getElementById('categoryDetailHeader').innerHTML=`<button class="cd-back" onclick="navTo('home')" title="返回">‹</button><div style="display:flex;justify-content:space-between;align-items:flex-start"><div class="cd-name">${escapeHtml(cat)}</div><button class="btn btn-primary btn-sm" onclick="navTo('expected','${escapeHtml(cat)}')">📋 到货表</button></div><div class="cd-meta">总库存：${fmt(total)} 件 | 库存价值：${fmtMoney(totalValue)} | 分类：${escapeHtml(p.location)||'—'}</div>`;
   document.getElementById('categoryDetailGrid').innerHTML=items.map(p=>{
     const stock=calcStock(p.id);const status=getStatus(p);
     const color=status==='out'?'#c88787':status==='low'?'#e5a85e':'#5ac4b4';
@@ -603,6 +615,43 @@ function renderCategoryDetail(cat){
   const txBody=document.getElementById('categoryTxBody');
   if(txs.length===0){txBody.innerHTML=`<tr><td colspan="6"><div class="empty">暂无流水</div></td></tr>`;return;}
   txBody.innerHTML=txs.map(t=>{const prod=getProduct(t.productId);const isIn=t.type==='in';return `<tr><td class="nowrap">${fmtDate(t.date)}</td><td>${escapeHtml(prod.sku)}</td><td class="text-center"><span class="tag ${isIn?'tag-normal':'tag-out-stock'}">${isIn?'入库':'出库'}</span></td><td class="text-right ${isIn?'text-success':'text-danger'}"><strong>${isIn?'+':'-'}${fmt(t.qty)}</strong></td><td>${escapeHtml(t.operator)||'—'}</td><td class="text-muted">${escapeHtml(t.salesChannel||t.notes)||'—'}</td></tr>`;}).join('');
+}
+function renderExpected(){
+  const cat=currentCategory;
+  const items=getProductsByCategory(cat);
+  if(items.length===0){navTo('home');return;}
+  const totalExpected=items.reduce((s,p)=>s+(p.expectedQty||0),0);
+  const totalIn=items.reduce((s,p)=>s+state.transactions.filter(t=>t.type==='in'&&t.productId===p.id).reduce((a,t)=>a+t.qty,0),0);
+  const totalOut=items.reduce((s,p)=>s+state.transactions.filter(t=>t.type==='out'&&t.productId===p.id).reduce((a,t)=>a+t.qty,0),0);
+  document.getElementById('expectedHeader').innerHTML=`<button class="cd-back" onclick="navTo('category-detail','${escapeHtml(cat)}')" title="返回">‹</button><div class="cd-name">${escapeHtml(cat)}</div><div class="cd-meta">应到：${fmt(totalExpected)} 件 | 实到：${fmt(totalIn)} 件 | 已出：${fmt(totalOut)} 件</div>`;
+  const body=document.getElementById('expectedBody');
+  body.innerHTML=items.map(p=>{
+    const inQty=state.transactions.filter(t=>t.type==='in'&&t.productId===p.id).reduce((a,t)=>a+t.qty,0);
+    const outQty=state.transactions.filter(t=>t.type==='out'&&t.productId===p.id).reduce((a,t)=>a+t.qty,0);
+    const stock=calcStock(p.id);
+    return `<tr><td><strong>${escapeHtml(p.sku)}</strong></td><td class="text-right"><input type="number" min="0" id="exp-${p.id}" value="${p.expectedQty||0}" style="width:70px;text-align:right;padding:4px 6px;border:1px solid var(--border);border-radius:6px"></td><td class="text-right">${fmt(inQty)}</td><td class="text-right">${fmt(outQty)}</td><td class="text-right"><strong>${fmt(stock)}</strong></td></tr>`;
+  }).join('');
+}
+async function saveExpectedQty(){
+  if(isLoading){toast('正在保存中，请勿重复点击','warning');return;}
+  const cat=currentCategory;
+  const items=getProductsByCategory(cat);
+  if(items.length===0)return;
+  isLoading=true;toast('正在保存应到数量...');
+  try{
+    for(const p of items){
+      const val=parseInt(document.getElementById('exp-'+p.id).value)||0;
+      if(val!==(p.expectedQty||0)){await Cloud.updateExpectedQty(p.id,val);}
+    }
+    await loadCloudData();
+    toast('应到数量已保存','success');
+  }catch(e){
+    console.error(e);
+    const msg=(e&&e.message)||'';
+    if(msg.includes('column')||msg.includes('expected_qty')||msg.includes('400')||msg.includes('404')){toast('保存失败：数据库缺少 expected_qty 字段，请先执行 ALTER TABLE 语句','error');}
+    else{toast('保存失败，请重试','error');}
+  }
+  isLoading=false;
 }
 function quickInOut(cat,sku){openSkuActionModal(cat,sku);}
 function openSkuActionModal(cat,sku){
