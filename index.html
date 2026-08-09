@@ -429,17 +429,17 @@ const API_HEADERS={'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,
 const Cloud={
   async loadAll(){
     const [pRes,tRes]=await Promise.all([
-      fetch(API_BASE+'/products?select=*&order=category,name',{headers:API_HEADERS}),
-      fetch(API_BASE+'/transactions?select=*&order=date.desc',{headers:API_HEADERS})
+      fetch(API_BASE+'/products_v2?select=*&order=category,name',{headers:API_HEADERS}),
+      fetch(API_BASE+'/transactions_v2?select=*&order=date.desc',{headers:API_HEADERS})
     ]);
     return {products:await pRes.json()||[],transactions:await tRes.json()||[]};
   },
-  async insertProduct(p){return fetch(API_BASE+'/products',{method:'POST',headers:API_HEADERS,body:JSON.stringify({id:p.id,name:p.name,sku:p.sku,category:p.category,location:p.location,purchase_price:p.purchasePrice||0,safety_stock:p.safetyStock||0,notes:p.notes,created_at:p.createdAt})}).then(r=>r.json());},
-  async updateProduct(id,data){return fetch(API_BASE+'/products?id=eq.'+id,{method:'PATCH',headers:API_HEADERS,body:JSON.stringify({name:data.name,sku:data.sku,category:data.category,location:data.location,purchase_price:data.purchasePrice||0,safety_stock:data.safetyStock||0,notes:data.notes})}).then(r=>r.json());},
-  async deleteProduct(id){await fetch(API_BASE+'/products?id=eq.'+id,{method:'DELETE',headers:API_HEADERS});},
-  async insertTransaction(t){return fetch(API_BASE+'/transactions',{method:'POST',headers:API_HEADERS,body:JSON.stringify({id:t.id,type:t.type,product_id:t.productId,qty:t.qty,price:t.price||0,date:t.date,operator:t.operator||'',purchase_date:t.purchaseDate||'',sales_channel:t.salesChannel||'',notes:t.notes,created_at:t.createdAt})}).then(r=>r.json());},
-  async deleteTransaction(id){await fetch(API_BASE+'/transactions?id=eq.'+id,{method:'DELETE',headers:API_HEADERS});},
-  async deleteAll(){await fetch(API_BASE+'/transactions?id=neq.x',{method:'DELETE',headers:API_HEADERS});await fetch(API_BASE+'/products?id=neq.x',{method:'DELETE',headers:API_HEADERS});}
+  async insertProduct(p){return fetch(API_BASE+'/products_v2',{method:'POST',headers:API_HEADERS,body:JSON.stringify({id:p.id,name:p.name,sku:p.sku,category:p.category,location:p.location,purchase_price:p.purchasePrice||0,safety_stock:p.safetyStock||0,notes:p.notes,created_at:p.createdAt})}).then(r=>r.json());},
+  async updateProduct(id,data){return fetch(API_BASE+'/products_v2?id=eq.'+id,{method:'PATCH',headers:API_HEADERS,body:JSON.stringify({name:data.name,sku:data.sku,category:data.category,location:data.location,purchase_price:data.purchasePrice||0,safety_stock:data.safetyStock||0,notes:data.notes})}).then(r=>r.json());},
+  async deleteProduct(id){await fetch(API_BASE+'/products_v2?id=eq.'+id,{method:'DELETE',headers:API_HEADERS});},
+  async insertTransaction(t){return fetch(API_BASE+'/transactions_v2',{method:'POST',headers:API_HEADERS,body:JSON.stringify({id:t.id,type:t.type,product_id:t.productId,qty:t.qty,price:t.price||0,date:t.date,operator:t.operator||'',purchase_date:t.purchaseDate||'',sales_channel:t.salesChannel||'',notes:t.notes,created_at:t.createdAt})}).then(r=>r.json());},
+  async deleteTransaction(id){await fetch(API_BASE+'/transactions_v2?id=eq.'+id,{method:'DELETE',headers:API_HEADERS});},
+  async deleteAll(){await fetch(API_BASE+'/transactions_v2?id=neq.x',{method:'DELETE',headers:API_HEADERS});await fetch(API_BASE+'/products_v2?id=neq.x',{method:'DELETE',headers:API_HEADERS});}
 };
 
 let state={products:[],transactions:[]};
