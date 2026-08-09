@@ -264,7 +264,7 @@ tbody tr:last-child td{border-bottom:none}
     <div id="page-all" class="page" style="display:none">
       <div class="panel">
         <div class="panel-header"><h2>全部SKU库存</h2><button class="btn btn-outline btn-sm" onclick="loadCloudData()">🔄 刷新</button></div>
-        <div class="table-wrap"><table><thead><tr><th>大类</th><th>SKU</th><th class="text-right">采购单价</th><th class="text-right">库存量</th><th class="text-right">库存价值</th><th class="text-center">状态</th><th>世代</th></tr></thead><tbody id="allBody"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>大类</th><th>SKU</th><th class="text-right">采购单价</th><th class="text-right">库存量</th><th class="text-right">库存价值</th><th class="text-center">状态</th><th>分类</th></tr></thead><tbody id="allBody"></tbody></table></div>
       </div>
     </div>
 
@@ -326,7 +326,7 @@ tbody tr:last-child td{border-bottom:none}
     <div id="page-alert" class="page" style="display:none">
       <div class="panel">
         <div class="panel-header"><h2>库存预警</h2><button class="btn btn-outline btn-sm" onclick="renderAlert()">🔄 刷新</button></div>
-        <div class="table-wrap"><table><thead><tr><th>大类</th><th>SKU</th><th class="text-right">当前库存</th><th class="text-right">安全库存</th><th class="text-right">缺口</th><th class="text-center">状态</th><th>世代</th></tr></thead><tbody id="alertBody"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>大类</th><th>SKU</th><th class="text-right">当前库存</th><th class="text-right">安全库存</th><th class="text-right">缺口</th><th class="text-center">状态</th><th>分类</th></tr></thead><tbody id="alertBody"></tbody></table></div>
       </div>
     </div>
   </main>
@@ -583,7 +583,7 @@ function renderCategoryDetail(cat){
   const p=items[0];
   const total=items.reduce((s,i)=>s+calcStock(i.id),0);
   const totalValue=items.reduce((s,i)=>s+calcStock(i.id)*(i.purchasePrice||0),0);
-  document.getElementById('categoryDetailHeader').innerHTML=`<button class="cd-back" onclick="navTo('home')" title="返回">‹</button><div class="cd-name">${escapeHtml(cat)}</div><div class="cd-meta">总库存：${fmt(total)} 件 | 库存价值：${fmtMoney(totalValue)} | 世代：${escapeHtml(p.location)||'—'}</div>`;
+  document.getElementById('categoryDetailHeader').innerHTML=`<button class="cd-back" onclick="navTo('home')" title="返回">‹</button><div class="cd-name">${escapeHtml(cat)}</div><div class="cd-meta">总库存：${fmt(total)} 件 | 库存价值：${fmtMoney(totalValue)} | 分类：${escapeHtml(p.location)||'—'}</div>`;
   document.getElementById('categoryDetailGrid').innerHTML=items.map(p=>{
     const stock=calcStock(p.id);const status=getStatus(p);
     const color=status==='out'?'#c88787':status==='low'?'#e5a85e':'#5ac4b4';
@@ -827,7 +827,7 @@ async function importData(e){
 async function exportExcel(){
   if(typeof XLSX==='undefined'){toast('Excel组件加载中，请稍后重试','error');return;}
   const wb=XLSX.utils.book_new();
-  const stockRows=state.products.map(p=>{const stock=calcStock(p.id);const status=stock<=0?'缺货':stock<=(p.safetyStock||0)?'库存偏低':'正常';return{大类:p.category||'',SKU:p.sku||'',采购单价:p.purchasePrice||0,库存量:stock,库存价值:stock*(p.purchasePrice||0),安全库存:p.safetyStock||0,状态:status,世代:p.location||''};});
+  const stockRows=state.products.map(p=>{const stock=calcStock(p.id);const status=stock<=0?'缺货':stock<=(p.safetyStock||0)?'库存偏低':'正常';return{大类:p.category||'',SKU:p.sku||'',采购单价:p.purchasePrice||0,库存量:stock,库存价值:stock*(p.purchasePrice||0),安全库存:p.safetyStock||0,状态:status,分类:p.location||''};});
   const ws1=XLSX.utils.json_to_sheet(stockRows);
   ws1['!cols']=[{wch:12},{wch:12},{wch:10},{wch:8},{wch:10},{wch:8},{wch:8},{wch:10}];
   XLSX.utils.book_append_sheet(wb,ws1,'SKU库存清单');
