@@ -291,7 +291,7 @@ tbody tr:last-child td{border-bottom:none}
       <div class="category-detail-header" id="expectedHeader"></div>
       <div class="panel">
         <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center"><h2>📋 应到 / 实到 / 已出</h2><span style="font-size:12px;color:var(--muted)">应到数量可直接修改</span></div>
-        <div class="table-wrap"><table><thead><tr><th>SKU</th><th class="text-right">应到</th><th class="text-right">实到</th><th class="text-right">已出</th><th class="text-right">差值</th><th class="text-right">当前库存</th></tr></thead><tbody id="expectedBody"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>SKU</th><th class="text-right">应到</th><th class="text-right">实到</th><th class="text-right">已出</th><th class="text-right">未到</th><th class="text-right">当前库存</th></tr></thead><tbody id="expectedBody"></tbody></table></div>
         <div style="padding:12px 16px;text-align:center"><button class="btn btn-primary" onclick="saveExpectedQty()">保存应到数量</button></div>
       </div>
     </div>
@@ -650,7 +650,7 @@ function renderExpected(){
     const inQty=state.transactions.filter(t=>t.type==='in'&&t.productId===p.id).reduce((a,t)=>a+t.qty,0);
     return s+Math.max((p.expectedQty||0)-inQty,0);
   },0);
-  document.getElementById('expectedHeader').innerHTML=`<button class="cd-back" onclick="navTo('category-detail','${escapeHtml(cat)}')" title="返回">‹</button><div class="cd-name">${escapeHtml(cat)}</div><div class="cd-meta">应到：${fmt(totalExpected)} 件 | 实到：${fmt(totalIn)} 件 | 已出：${fmt(totalOut)} 件 | 差值：${fmt(totalDiff)} 件</div>`;
+  document.getElementById('expectedHeader').innerHTML=`<button class="cd-back" onclick="navTo('category-detail','${escapeHtml(cat)}')" title="返回">‹</button><div class="cd-name">${escapeHtml(cat)}</div><div class="cd-meta">应到：${fmt(totalExpected)} 件 | 实到：${fmt(totalIn)} 件 | 已出：${fmt(totalOut)} 件 | 未到：${fmt(totalDiff)} 件</div>`;
   const body=document.getElementById('expectedBody');
   body.innerHTML=items.map(p=>{
     const inQty=state.transactions.filter(t=>t.type==='in'&&t.productId===p.id).reduce((a,t)=>a+t.qty,0);
