@@ -106,15 +106,16 @@ header{background:linear-gradient(135deg,#ffc9ca 0%,#ffe8e8 100%);color:#6b4c5a;
 .category-detail-header .cd-back{position:absolute;top:18px;left:16px;width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.3);border:none;color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s;padding:0}
 .category-detail-header .cd-back:hover{background:rgba(255,255,255,.5)}
 
-.sku-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
-.sku-card{background:var(--card);border-radius:10px;padding:14px;box-shadow:var(--shadow);border:1px solid var(--border);cursor:pointer;transition:transform .15s,border-color .15s}
+.sku-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.sku-card{background:var(--card);border-radius:8px;padding:10px;box-shadow:var(--shadow);border:1px solid var(--border);cursor:pointer;transition:transform .15s,border-color .15s}
 .sku-card:hover{transform:translateY(-2px);border-color:var(--primary)}
-.sku-card .sku-name{font-size:15px;font-weight:600;margin-bottom:4px}
-.sku-card .sku-stock{font-size:28px;font-weight:800;margin:8px 0}
+.sku-card .sku-name{font-size:13px;font-weight:600;margin-bottom:2px}
+.sku-card .sku-stock{font-size:22px;font-weight:800;margin:4px 0}
 .sku-card .sku-stock.normal{color:#5ac4b4}
 .sku-card .sku-stock.low{color:#c68a3e}
 .sku-card .sku-stock.out{color:#c88787}
-.sku-card .sku-btns{display:flex;gap:6px;margin-top:10px}
+.sku-card .sku-btns{display:flex;gap:4px;margin-top:8px}
+.sku-card .sku-btns .btn{padding:5px 8px;font-size:12px;border-radius:6px}
 
 .btn{padding:7px 13px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:500;transition:all .15s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
 .btn-primary{background:var(--primary);color:#fff}
@@ -183,7 +184,7 @@ tbody tr:last-child td{border-bottom:none}
   .sidebar.mobile-show{transform:translateX(0)}
   .main{margin-left:0!important;padding:14px}
   .quick-btn{min-width:140px}
-  .sku-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+  .sku-grid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}
 }
 </style>
 </head>
@@ -624,7 +625,7 @@ function renderCategoryDetail(cat){
     return `<div class="sku-card" onclick="openSkuActionModal('${escapeHtml(cat)}','${escapeHtml(p.sku)}')">
       <div class="sku-name">${escapeHtml(p.sku)}</div>
       <div class="sku-stock ${status}" style="color:${color}">${fmt(stock)}</div>
-      <div class="text-muted" style="font-size:11px">单价 ${p.purchasePrice?fmtMoney(p.purchasePrice):'未设'} · 价值 ${fmtMoney(stock*(p.purchasePrice||0))}</div>
+      <div class="text-muted" style="font-size:10px">单价 ${p.purchasePrice?fmtMoney(p.purchasePrice):'未设'} · 价值 ${fmtMoney(stock*(p.purchasePrice||0))}</div>
       <div class="sku-btns">
         <button class="btn btn-success btn-sm" onclick="event.stopPropagation();openInboundModal('${escapeHtml(cat)}','${escapeHtml(p.sku)}')">📥</button>
         <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();openOutboundModal('${escapeHtml(cat)}','${escapeHtml(p.sku)}')">📤</button>
