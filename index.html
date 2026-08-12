@@ -216,10 +216,10 @@ tbody tr:last-child td{border-bottom:none}
       <h1><span class="logo">📦</span> 工作室周边库存管理工作台</h1>
     </div>
     <div class="header-actions">
-      <button onclick="exportData()">⬇️ 导出</button>
+      <button onclick="openExportModal('json')">⬇️ 导出</button>
       <button onclick="document.getElementById('importFile').click()">⬆️ 导入</button>
       <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
-      <button onclick="exportExcel()">📊 Excel</button>
+      <button onclick="openExportModal('excel')">📊 Excel</button>
       <button onclick="clearAllData()" style="background:rgba(200,135,135,.2)">🗑️ 清空</button>
       <button onclick="addToHomeScreen()" style="background:rgba(255,201,202,.3)">📱 添加桌面</button>
       <button onclick="logout()" style="background:rgba(200,135,135,.2)">🚪 退出</button>
@@ -363,6 +363,25 @@ tbody tr:last-child td{border-bottom:none}
       <div style="font-size:12px;color:var(--muted)">选择「四代」自动生成16个SKU；选择「五代」目前只生成家族款</div>
     </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('categoryModal')">取消</button><button class="btn btn-primary" onclick="saveCategory()">保存</button></div>
+  </div>
+</div>
+
+<!-- 导出筛选 Modal -->
+<div class="modal-overlay" id="exportModal">
+  <div class="modal">
+    <div class="modal-header"><h3>导出数据（按时间筛选）</h3><button class="modal-close" onclick="closeModal('exportModal')">×</button></div>
+    <div class="modal-body">
+      <p class="text-muted" style="font-size:12px;margin-bottom:12px">库存清单为当前快照；按日期筛选仅作用于入库/出库流水记录。</p>
+      <div style="display:flex;gap:12px;margin-bottom:14px">
+        <label style="flex:1">开始日期<br><input type="date" id="expStart" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:8px;margin-top:4px"></label>
+        <label style="flex:1">结束日期<br><input type="date" id="expEnd" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:8px;margin-top:4px"></label>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:4px">格式：
+        <button class="btn btn-sm" id="fmtJson" onclick="setExportFormat('json')" style="background:var(--primary);color:#fff">⬇️ JSON</button>
+        <button class="btn btn-sm" id="fmtExcel" onclick="setExportFormat('excel')" style="background:rgba(0,0,0,.06)">📊 Excel</button>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('exportModal')">取消</button><button class="btn btn-primary" onclick="doExport()">导出</button></div>
   </div>
 </div>
 
@@ -878,7 +897,20 @@ function renderAlert(){
   }).join('');
 }
 
-async function exportData(){const data=JSON.stringify({products:state.products,transactions:state.transactions},null,2);const blob=new Blob([data],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`周边库存数据_${today()}.json`;a.click();toast('数据已导出','success');}
+let exportFormat='json';
+function setExportFormat(fmt){exportFormat=fmt;document.getElementById('fmtJson').style.background=fmt==='json'?'var(--primary)':'rgba(0,0,0,.06)';document.getElementById('fmtJson').style.color=fmt==='json'?'#fff':'inherit';document.getElementById('fmtExcel').style.background=fmt==='excel'?'var(--primary)':'rgba(0,0,0,.06)';document.getElementById('fmtExcel').style.color=fmt==='excel'?'#fff':'inherit';}
+function openExportModal(fmt){exportFormat=fmt||'json';setExportFormat(exportFormat);document.getElementById('expStart').value='';document.getElementById('expEnd').value='';document.getElementById('exportModal').classList.add('show');}
+function filteredTransactions(s,e){return state.transactions.filter(t=>{if(s&&t.date<s)return false;if(e&&t.date>e)return false;return true;});}
+function exportRangeLabel(s,e){if(s&&e)return `（${s}~${e}）`;if(s)return `（${s}起）`;if(e)return `（至${e}）`;return '';}
+async function exportData(s,e){
+  s=s||'';e=e||'';
+  const txs=filteredTransactions(s,e);
+  const data=JSON.stringify({products:state.products,transactions:txs},null,2);
+  const blob=new Blob([data],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`周边库存数据_${today()}${exportRangeLabel(s,e)}.json`;a.click();
+  toast(`已导出 ${state.products.length} 商品 / ${txs.length} 条流水`,'success');
+}
+function doExport(){const s=document.getElementById('expStart').value;const e=document.getElementById('expEnd').value;closeModal('exportModal');if(exportFormat==='excel')exportExcel(s,e);else exportData(s,e);}
 
 let deferredPrompt=null;
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;console.log('安装提示已捕获');});
@@ -901,23 +933,25 @@ async function importData(e){
   reader.onload=async ev=>{try{const d=JSON.parse(ev.target.result);if(!d.products||!d.transactions)throw new Error('格式错误');if(confirm(`即将导入：\n商品 ${d.products.length} 条\n流水 ${d.transactions.length} 条\n\n将覆盖当前数据，确认？`)){toast('正在导入...');await Cloud.deleteAll();for(const p of d.products){await Cloud.insertProduct({id:p.id||uid(),name:p.name,sku:p.sku||p.sku,category:p.category||p.name,location:p.location,purchasePrice:p.purchasePrice||0,safetyStock:p.safetyStock||0,notes:p.notes||'',createdAt:p.createdAt||Date.now()});}for(const t of d.transactions){await Cloud.insertTransaction({id:t.id||uid(),type:t.type,productId:t.productId,qty:t.qty,price:t.price||0,date:t.date||today(),operator:t.operator||'',purchaseDate:t.purchaseDate||'',salesChannel:t.salesChannel||'',notes:t.notes||'',createdAt:t.createdAt||Date.now()});}await loadCloudData();toast('数据导入成功','success');}}catch(err){toast('导入失败：'+err.message,'error');}};
   reader.readAsText(file);e.target.value='';
 }
-async function exportExcel(){
+async function exportExcel(s,e){
   if(typeof XLSX==='undefined'){toast('Excel组件加载中，请稍后重试','error');return;}
+  s=s||'';e=e||'';
+  const txs=filteredTransactions(s,e);
   const wb=XLSX.utils.book_new();
   const stockRows=state.products.map(p=>{const stock=calcStock(p.id);const status=stock<=0?'缺货':stock<=(p.safetyStock||0)?'库存偏低':'正常';return{大类:p.category||'',SKU:p.sku||'',采购单价:p.purchasePrice||0,库存量:stock,库存价值:stock*(p.purchasePrice||0),安全库存:p.safetyStock||0,状态:status,分类:p.location||''};});
   const ws1=XLSX.utils.json_to_sheet(stockRows);
   ws1['!cols']=[{wch:12},{wch:12},{wch:10},{wch:8},{wch:10},{wch:8},{wch:8},{wch:10}];
   XLSX.utils.book_append_sheet(wb,ws1,'SKU库存清单');
-  const inRows=state.transactions.filter(t=>t.type==='in').sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(t=>{const p=getProduct(t.productId);return{日期:t.date||'',大类:p?p.category:'',SKU:p?p.sku:'',数量:t.qty,单价:t.price||0,金额:t.qty*(t.price||0),入库人:t.operator||'',备注:t.notes||''};});
+  const inRows=txs.filter(t=>t.type==='in').sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(t=>{const p=getProduct(t.productId);return{日期:t.date||'',大类:p?p.category:'',SKU:p?p.sku:'',数量:t.qty,单价:t.price||0,金额:t.qty*(t.price||0),入库人:t.operator||'',备注:t.notes||''};});
   const ws2=XLSX.utils.json_to_sheet(inRows);
   ws2['!cols']=[{wch:12},{wch:12},{wch:12},{wch:8},{wch:10},{wch:10},{wch:10},{wch:20}];
   XLSX.utils.book_append_sheet(wb,ws2,'入库记录');
-  const outRows=state.transactions.filter(t=>t.type==='out').sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(t=>{const p=getProduct(t.productId);return{日期:t.date||'',大类:p?p.category:'',SKU:p?p.sku:'',数量:t.qty,单价:t.price||0,金额:t.qty*(t.price||0),出库渠道:t.salesChannel||'',出库人:t.operator||'',备注:t.notes||''};});
+  const outRows=txs.filter(t=>t.type==='out').sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(t=>{const p=getProduct(t.productId);return{日期:t.date||'',大类:p?p.category:'',SKU:p?p.sku:'',数量:t.qty,单价:t.price||0,金额:t.qty*(t.price||0),出库渠道:t.salesChannel||'',出库人:t.operator||'',备注:t.notes||''};});
   const ws3=XLSX.utils.json_to_sheet(outRows);
   ws3['!cols']=[{wch:12},{wch:12},{wch:12},{wch:8},{wch:10},{wch:10},{wch:12},{wch:10},{wch:20}];
   XLSX.utils.book_append_sheet(wb,ws3,'出库记录');
-  XLSX.writeFile(wb,`周边库存报表_${today()}.xlsx`);
-  toast('Excel报表已导出','success');
+  XLSX.writeFile(wb,`周边库存报表_${today()}${exportRangeLabel(s,e)}.xlsx`);
+  toast(`Excel已导出（${inRows.length} 入库 / ${outRows.length} 出库）`,'success');
 }
 async function clearAllData(){if(confirm('⚠️ 确定清空所有数据吗？\n\n此操作不可恢复！建议先导出备份。\n\n确定要清空吗？')){if(confirm('再次确认：真的要清空全部数据吗？')){try{await Cloud.deleteAll();await loadCloudData();toast('数据已清空','success');}catch(e){toast('清空失败','error');}}}}
 
