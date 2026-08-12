@@ -261,7 +261,7 @@ tbody tr:last-child td{border-bottom:none}
       <div class="stats" id="statsBar"></div>
       <div class="panel">
         <div class="panel-header"><h2>大类库存总览</h2><button class="btn btn-outline btn-sm" onclick="loadCloudData()">🔄 刷新</button></div>
-        <div class="table-wrap"><table><thead><tr><th>大类名称</th><th class="text-right">SKU数</th><th class="text-right">总库存</th><th class="text-right">库存价值</th><th class="text-center">操作</th></tr></thead><tbody id="homeOverviewBody"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>大类名称</th><th class="text-right">总库存</th><th class="text-right">库存价值</th><th class="text-center">操作</th></tr></thead><tbody id="homeOverviewBody"></tbody></table></div>
       </div>
     </div>
 
@@ -573,14 +573,13 @@ function renderHome(){
   renderStatsBar();
   const cats=getCategories();
   const body=document.getElementById('homeOverviewBody');
-  if(cats.length===0){body.innerHTML=`<tr><td colspan="5"><div class="empty"><div class="icon">📦</div>暂无大类，点击左侧「新增大类」开始</div></td></tr>`;return;}
+  if(cats.length===0){body.innerHTML=`<tr><td colspan="4"><div class="empty"><div class="icon">📦</div>暂无大类，点击左侧「新增大类」开始</div></td></tr>`;return;}
   body.innerHTML=cats.map(cat=>{
     const items=getProductsByCategory(cat);
     const total=items.reduce((s,p)=>s+calcStock(p.id),0);
     const value=items.reduce((s,p)=>s+calcStock(p.id)*(p.purchasePrice||0),0);
     return `<tr style="cursor:pointer" onclick="navToCategory('${escapeHtml(cat)}')" onmouseover="this.style.background='var(--primary-light)'" onmouseout="this.style.background=''">
       <td><strong>${escapeHtml(cat)}</strong></td>
-      <td class="text-right">${items.length}</td>
       <td class="text-right"><strong>${fmt(total)}</strong></td>
       <td class="text-right text-muted">${fmtMoney(value)}</td>
       <td class="text-center"><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();navToCategory('${escapeHtml(cat)}')">查看详情 →</button></td>
