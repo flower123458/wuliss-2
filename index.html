@@ -282,7 +282,7 @@ tbody tr:last-child td{border-bottom:none}
         <div class="sku-grid" id="categoryDetailGrid"></div>
       </div>
       <div class="panel">
-        <div class="panel-header"><h2>最近流水</h2></div>
+        <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center"><h2>最近流水</h2><button class="btn btn-outline btn-sm" onclick="openTxFilterModal()">🔍 筛选</button></div>
         <div class="table-wrap"><table><thead><tr><th>日期</th><th>SKU</th><th class="text-center">类型</th><th class="text-right">数量</th><th>操作人</th><th>渠道/备注</th></tr></thead><tbody id="categoryTxBody"></tbody></table></div>
       </div>
     </div>
@@ -385,6 +385,23 @@ tbody tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+<!-- 流水筛选 Modal -->
+<div class="modal-overlay" id="txFilterModal">
+  <div class="modal">
+    <div class="modal-header"><h3>筛选流水</h3><button class="modal-close" onclick="closeModal('txFilterModal')">×</button></div>
+    <div class="modal-body">
+      <div style="display:flex;gap:12px;margin-bottom:14px">
+        <label style="flex:1">开始日期<br><input type="date" id="txFilterStart" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:8px;margin-top:4px"></label>
+        <label style="flex:1">结束日期<br><input type="date" id="txFilterEnd" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:8px;margin-top:4px"></label>
+      </div>
+      <div style="margin-bottom:8px">
+        <label>SKU 关键词<br><input type="text" id="txFilterSku" placeholder="输入 SKU 关键字" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:8px;margin-top:4px"></label>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="resetTxFilter()">重置</button><button class="btn btn-outline" onclick="closeModal('txFilterModal')">取消</button><button class="btn btn-primary" onclick="applyTxFilter()">应用</button></div>
+  </div>
+</div>
+
 <!-- 入库 Modal -->
 <div class="modal-overlay" id="inboundModal">
   <div class="modal">
@@ -484,6 +501,9 @@ const Cloud={
 let state={products:[],transactions:[]};
 let currentCategory=null;
 let isLoading=false;
+let txFilter={start:'',end:'',sku:''};
+const TX_PAGE_SIZE=20;
+let txPagination={page:1};
 
 const fmt=n=>(n||0).toLocaleString('zh-CN',{minimumFractionDigits:0,maximumFractionDigits:2});
 const fmtMoney=n=>'¥'+fmt(n||0);
@@ -652,11 +672,33 @@ function renderCategoryDetail(cat){
       </div>
     </div>`;
   }).join('');
-  // 最近流水
-  const txs=state.transactions.filter(t=>{const prod=getProduct(t.productId);return prod&&prod.category===cat}).sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt-a.createdAt).slice(0,20);
+  // 最近流水（筛选+分页）
+  let txs=state.transactions.filter(t=>{const prod=getProduct(t.productId);return prod&&prod.category===cat});
+  if(txFilter.start)txs=txs.filter(t=>t.date>=txFilter.start);
+  if(txFilter.end)txs=txs.filter(t=>t.date<=txFilter.end);
+  if(txFilter.sku){
+    const kw=txFilter.sku.toLowerCase();
+    txs=txs.filter(t=>{const prod=getProduct(t.productId);return prod&&prod.sku.toLowerCase().includes(kw);});
+  }
+  txs=txs.sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt-a.createdAt);
+  const totalCount=txs.length;
+  const totalPages=Math.max(1,Math.ceil(totalCount/TX_PAGE_SIZE));
+  if(txPagination.page>totalPages)txPagination.page=totalPages;
+  if(txPagination.page<1)txPagination.page=1;
+  const startIdx=(txPagination.page-1)*TX_PAGE_SIZE;
+  const pagedTxs=txs.slice(startIdx,startIdx+TX_PAGE_SIZE);
   const txBody=document.getElementById('categoryTxBody');
-  if(txs.length===0){txBody.innerHTML=`<tr><td colspan="6"><div class="empty">暂无流水</div></td></tr>`;return;}
-  txBody.innerHTML=txs.map(t=>{const prod=getProduct(t.productId);const isIn=t.type==='in';return `<tr><td class="nowrap">${fmtDate(t.date)}</td><td>${escapeHtml(prod.sku)}</td><td class="text-center"><span class="tag ${isIn?'tag-normal':'tag-out-stock'}">${isIn?'入库':'出库'}</span></td><td class="text-right ${isIn?'text-success':'text-danger'}"><strong>${isIn?'+':'-'}${fmt(t.qty)}</strong></td><td>${escapeHtml(t.operator)||'—'}</td><td class="text-muted">${escapeHtml(t.salesChannel||t.notes)||'—'}</td></tr>`;}).join('');
+  if(totalCount===0){txBody.innerHTML=`<tr><td colspan="6"><div class="empty">暂无流水</div></td></tr>`;return;}
+  let rows=pagedTxs.map(t=>{const prod=getProduct(t.productId);const isIn=t.type==='in';return `<tr><td class="nowrap">${fmtDate(t.date)}</td><td>${escapeHtml(prod.sku)}</td><td class="text-center"><span class="tag ${isIn?'tag-normal':'tag-out-stock'}">${isIn?'入库':'出库'}</span></td><td class="text-right ${isIn?'text-success':'text-danger'}"><strong>${isIn?'+':'-'}${fmt(t.qty)}</strong></td><td>${escapeHtml(t.operator)||'—'}</td><td class="text-muted">${escapeHtml(t.salesChannel||t.notes)||'—'}</td></tr>`;}).join('');
+  if(totalPages>1){
+    let pager='<tr><td colspan="6"><div style="display:flex;justify-content:flex-end;align-items:center;gap:6px;padding:8px 0"><span style="font-size:12px;color:var(--muted)">共 '+totalCount+' 条</span>';
+    for(let i=1;i<=totalPages;i++){
+      pager+=`<button class="btn btn-sm ${i===txPagination.page?'btn-primary':'btn-outline'}" onclick="goToTxPage(${i})" style="min-width:30px;padding:4px 8px">${i}</button>`;
+    }
+    pager+='</div></td></tr>';
+    rows+=pager;
+  }
+  txBody.innerHTML=rows;
 }
 function renderExpected(){
   const cat=currentCategory;
@@ -954,6 +996,30 @@ async function exportExcel(s,e){
   toast(`Excel已导出（${inRows.length} 入库 / ${outRows.length} 出库）`,'success');
 }
 async function clearAllData(){if(confirm('⚠️ 确定清空所有数据吗？\n\n此操作不可恢复！建议先导出备份。\n\n确定要清空吗？')){if(confirm('再次确认：真的要清空全部数据吗？')){try{await Cloud.deleteAll();await loadCloudData();toast('数据已清空','success');}catch(e){toast('清空失败','error');}}}}
+
+function openTxFilterModal(){
+  document.getElementById('txFilterStart').value=txFilter.start;
+  document.getElementById('txFilterEnd').value=txFilter.end;
+  document.getElementById('txFilterSku').value=txFilter.sku;
+  document.getElementById('txFilterModal').classList.add('show');
+}
+function applyTxFilter(){
+  txFilter.start=document.getElementById('txFilterStart').value;
+  txFilter.end=document.getElementById('txFilterEnd').value;
+  txFilter.sku=document.getElementById('txFilterSku').value.trim();
+  txPagination.page=1;
+  closeModal('txFilterModal');
+  renderCategoryDetail(currentCategory);
+}
+function resetTxFilter(){
+  txFilter={start:'',end:'',sku:''};txPagination.page=1;
+  document.getElementById('txFilterStart').value='';
+  document.getElementById('txFilterEnd').value='';
+  document.getElementById('txFilterSku').value='';
+  closeModal('txFilterModal');
+  renderCategoryDetail(currentCategory);
+}
+function goToTxPage(p){txPagination.page=p;renderCategoryDetail(currentCategory);}
 
 function closeModal(id){document.getElementById(id).classList.remove('show')}
 document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('show')});});
