@@ -301,8 +301,14 @@ tbody tr:last-child td{border-bottom:none}
     <div id="page-person-stock" class="page" style="display:none">
       <div class="category-detail-header" id="personStockHeader"></div>
       <div class="panel">
-        <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center"><h2>👤 按人库存</h2><span style="font-size:12px;color:var(--muted)">按录入/录出人统计每个 SKU 剩余</span></div>
-        <div id="personStockBody"></div>
+        <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><h2>👤 按人库存</h2>
+          <div style="display:flex;gap:6px;flex-wrap:wrap" id="personStockOpBtns">
+            <button class="btn btn-sm" data-op="11" onclick="setPersonStockOp('11')">11</button>
+            <button class="btn btn-sm" data-op="笋笋" onclick="setPersonStockOp('笋笋')">笋笋</button>
+            <button class="btn btn-sm" data-op="小碗" onclick="setPersonStockOp('小碗')">小碗</button>
+          </div>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>SKU</th><th class="text-right">剩余数量</th></tr></thead><tbody id="personStockBody"></tbody></table></div>
       </div>
     </div>
 
@@ -512,6 +518,7 @@ let currentCategory=null;
 let isLoading=false;
 let currentOperator=null;
 let txFilter={start:'',end:'',sku:''};
+let personStockOperator='';
 const TX_PAGE_SIZE=20;
 let txPagination={page:1};
 
@@ -760,33 +767,24 @@ function renderPersonStock(cat){
   const total=items.reduce((s,i)=>s+calcStock(i.id),0);
   const totalValue=items.reduce((s,i)=>s+calcStock(i.id)*(i.purchasePrice||0),0);
   const p=items[0];
+  const op=personStockOperator||currentOperator||OPERATOR_OPTIONS[0];
   document.getElementById('personStockHeader').innerHTML=`<button class="cd-back" onclick="navTo('category-detail','${escapeHtml(cat)}')" title="返回">‹</button><div class="cd-name">${escapeHtml(cat)}</div><div class="cd-meta">总库存：${fmt(total)} 件 | 库存价值：${fmtMoney(totalValue)} | 分类：${escapeHtml(p.location)||'—'}</div>`;
-  const operators=OPERATOR_OPTIONS;
+  document.querySelectorAll('#personStockOpBtns button').forEach(b=>{
+    const active=b.dataset.op===op;
+    b.className='btn btn-sm '+(active?'btn-primary':'btn-outline');
+    b.style.color=active?'#fff':'';
+    b.style.background=active?'var(--primary)':'';
+  });
   const body=document.getElementById('personStockBody');
-  body.innerHTML=items.map(p=>{
-    const rows=operators.map(op=>{
-      const inQty=state.transactions.filter(t=>t.type==='in'&&t.productId===p.id&&t.operator===op).reduce((a,t)=>a+t.qty,0);
-      const outQty=state.transactions.filter(t=>t.type==='out'&&t.productId===p.id&&t.operator===op).reduce((a,t)=>a+t.qty,0);
-      const remain=inQty-outQty;
-      const zero=inQty===0&&outQty===0;
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);${zero?'opacity:.55':''}">
-        <div style="display:flex;align-items:center;gap:8px"><span class="tag" style="background:var(--primary-light);color:var(--primary)">${escapeHtml(op)}</span></div>
-        <div style="display:flex;gap:12px;font-size:13px">
-          <span>录入 <strong>${fmt(inQty)}</strong></span>
-          <span>录出 <strong>${fmt(outQty)}</strong></span>
-          <span>剩余 <strong style="color:${remain<0?'var(--danger)':remain>0?'var(--success)':'inherit'}">${fmt(remain)}</strong></span>
-        </div>
-      </div>`;
-    }).join('');
-    return `<div class="sku-card" style="margin-bottom:10px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-        <div class="sku-name" style="font-size:15px">${escapeHtml(p.sku)}</div>
-        <div style="font-size:12px;color:var(--muted)">当前库存 <strong>${fmt(calcStock(p.id))}</strong></div>
-      </div>
-      ${rows}
-    </div>`;
-  }).join('');
+  const data=items.map(p=>{
+    const inQty=state.transactions.filter(t=>t.type==='in'&&t.productId===p.id&&t.operator===op).reduce((a,t)=>a+t.qty,0);
+    const outQty=state.transactions.filter(t=>t.type==='out'&&t.productId===p.id&&t.operator===op).reduce((a,t)=>a+t.qty,0);
+    return {sku:p.sku,remain:inQty-outQty};
+  }).sort((a,b)=>b.remain-a.remain);
+  if(data.length===0){body.innerHTML=`<tr><td colspan="2"><div class="empty">暂无 SKU</div></td></tr>`;return;}
+  body.innerHTML=data.map(d=>`<tr><td>${escapeHtml(d.sku)}</td><td class="text-right"><strong style="color:${d.remain<0?'var(--danger)':d.remain>0?'var(--success)':'inherit'}">${fmt(d.remain)}</strong></td></tr>`).join('');
 }
+function setPersonStockOp(op){personStockOperator=op;renderPersonStock(currentCategory);}
 function quickInOut(cat,sku){openSkuActionModal(cat,sku);}
 function openSkuActionModal(cat,sku){
   document.getElementById('skuActionTitle').textContent=`${cat} - ${sku}`;
