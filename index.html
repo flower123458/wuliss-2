@@ -327,6 +327,7 @@ tbody tr:last-child td{border-bottom:none}
               <input type="date" id="filterInStart" onchange="renderInbound()">
               <input type="date" id="filterInEnd" onchange="renderInbound()">
             </div>
+            <button class="btn btn-outline btn-sm" onclick="loadCloudData()">🔄 刷新</button>
             <button class="btn btn-success" onclick="openInboundModal()">➕ 新增入库</button>
           </div>
         </div>
@@ -348,6 +349,7 @@ tbody tr:last-child td{border-bottom:none}
               <input type="date" id="filterOutStart" onchange="renderOutbound()">
               <input type="date" id="filterOutEnd" onchange="renderOutbound()">
             </div>
+            <button class="btn btn-outline btn-sm" onclick="loadCloudData()">🔄 刷新</button>
             <button class="btn btn-danger" onclick="openOutboundModal()">➕ 新增出库</button>
           </div>
         </div>
