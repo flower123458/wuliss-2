@@ -206,7 +206,6 @@ tbody tr:last-child td{border-bottom:none}
     </div>
     <button onclick="doLogin()" style="width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#ffc9ca,#f4deda);color:#6b4c5a;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .2s">登 录</button>
     <p id="loginError" style="color:#c88787;font-size:12px;margin-top:12px;height:14px"></p>
-    <p id="loginHint" style="color:#a88890;font-size:11px;margin-top:14px;line-height:1.7"></p>
   </div>
 </div>
 
@@ -1134,7 +1133,6 @@ if(checkAuth()){
   initApp();
 }else{
   document.getElementById('loginPage').style.display='flex';
-  document.getElementById('loginHint').innerHTML='可用账号：<br>'+AUTH_ACCOUNTS.map(a=>`${escapeHtml(a.user)} / ${escapeHtml(a.pass)}`).join('　·　');
 }
 </script>
 </body>
