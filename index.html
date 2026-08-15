@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#ffc9ca">
+<meta name="theme-color" content="#AF7C73">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="库存工作台">
@@ -15,24 +15,26 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root{
-  --bg:#d0f9f1;--card:#ffffff;--border:#ffc9ca;--text:#6b4c5a;--muted:#a88890;
-  --primary:#ffc9ca;--primary-light:#ffe8e8;--success:#a0e8da;--success-light:#e3f9f4;
-  --danger:#c88787;--danger-light:#f5e3e3;--warning:#e5a85e;--warning-light:#fcf3e6;
-  --shadow:0 1px 3px rgba(107,76,90,.06),0 1px 2px rgba(107,76,90,.04);--radius:12px;
+  --bg:#FDF6F0;--card:#FFFFFF;--border:#EDDCD2;--text:#481F19;--muted:#9A7E74;
+  --primary:#AF7C73;--primary-light:#F5E6E0;--secondary:#7F6D8F;
+  --success:#7E8E76;--success-light:#EEF2EB;
+  --danger:#A04A42;--danger-light:#F7EAE8;
+  --warning:#C68A4A;--warning-light:#F9F0E6;
+  --shadow:0 1px 3px rgba(72,31,25,.06),0 1px 2px rgba(72,31,25,.04);--radius:12px;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);line-height:1.6;font-size:14px}
 button{font-family:inherit}
 input,select,textarea{font-family:inherit;font-size:14px}
 
-header{background:linear-gradient(135deg,#ffc9ca 0%,#ffe8e8 100%);color:#6b4c5a;padding:14px 20px;box-shadow:var(--shadow);position:sticky;top:0;z-index:100}
+header{background:linear-gradient(135deg,#AF7C73 0%,#C9A99F 100%);color:#481F19;padding:14px 20px;box-shadow:var(--shadow);position:sticky;top:0;z-index:100}
 .header-inner{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
 .header-left{display:flex;align-items:center;gap:10px}
-.menu-toggle{background:rgba(255,255,255,.35);border:1px solid rgba(255,255,255,.5);color:#6b4c5a;width:34px;height:34px;border-radius:8px;cursor:pointer;font-size:18px;display:none;align-items:center;justify-content:center}
+.menu-toggle{background:rgba(255,255,255,.35);border:1px solid rgba(255,255,255,.5);color:#481F19;width:34px;height:34px;border-radius:8px;cursor:pointer;font-size:18px;display:none;align-items:center;justify-content:center}
 .header-inner h1{font-size:17px;font-weight:600;display:flex;align-items:center;gap:8px}
 .header-inner h1 .logo{font-size:20px}
 .header-actions{display:flex;gap:6px;flex-wrap:wrap}
-.header-actions button{background:rgba(255,255,255,.35);color:#6b4c5a;border:1px solid rgba(255,255,255,.5);padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;transition:all .2s}
+.header-actions button{background:rgba(255,255,255,.35);color:#481F19;border:1px solid rgba(255,255,255,.5);padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;transition:all .2s}
 .header-actions button:hover{background:rgba(255,255,255,.5)}
 
 .layout{display:flex;min-height:calc(100vh - 56px)}
@@ -42,7 +44,7 @@ header{background:linear-gradient(135deg,#ffc9ca 0%,#ffe8e8 100%);color:#6b4c5a;
 .sidebar-header-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .sidebar-title{font-size:13px;font-weight:600;color:var(--text)}
 .collapse-btn{background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted);padding:2px 6px;border-radius:4px}
-.collapse-btn:hover{background:#f3f4f6}
+.collapse-btn:hover{background:#F7EFEA}
 .sidebar-search{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none}
 .sidebar-search:focus{border-color:var(--primary)}
 .nav-section-title{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:10px 16px 4px;font-weight:600}
@@ -58,13 +60,13 @@ header{background:linear-gradient(135deg,#ffc9ca 0%,#ffe8e8 100%);color:#6b4c5a;
 .nav-item .badge{margin-left:auto;background:rgba(0,0,0,.08);padding:1px 6px;border-radius:10px;font-size:10px;min-width:18px;text-align:center}
 .nav-item.active .badge{background:var(--primary);color:#fff}
 .cat-item{display:flex;align-items:center;gap:8px;padding:7px 16px;cursor:pointer;font-size:13px;transition:all .15s;border-left:3px solid transparent}
-.cat-item:hover{background:#f9fafb}
+.cat-item:hover{background:#FDF8F4}
 .cat-item.active{background:var(--primary-light);border-left-color:var(--primary)}
 .cat-item .cname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cat-item .cstock{font-size:11px;font-weight:600;padding:1px 7px;border-radius:10px;flex-shrink:0}
-.cat-item .cstock.normal{background:#e3f9f4;color:#5ac4b4}
-.cat-item .cstock.low{background:#fcf3e6;color:#c68a3e}
-.cat-item .cstock.out{background:#f5e3e3;color:#c88787}
+.cat-item .cstock.normal{background:#EEF2EB;color:#7E8E76}
+.cat-item .cstock.low{background:#F9F0E6;color:#C68A4A}
+.cat-item .cstock.out{background:#F7EAE8;color:#A04A42}
 
 .main{flex:1;padding:18px;margin-left:240px;transition:margin-left .25s ease;min-width:0}
 .main.full{margin-left:0}
@@ -74,8 +76,8 @@ header{background:linear-gradient(135deg,#ffc9ca 0%,#ffe8e8 100%);color:#6b4c5a;
 .quick-actions{display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap}
 .quick-btn{flex:1;min-width:180px;padding:18px;border-radius:var(--radius);border:none;cursor:pointer;text-align:left;transition:transform .15s,box-shadow .15s;color:#fff;box-shadow:var(--shadow)}
 .quick-btn:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.12)}
-.quick-btn.in{background:linear-gradient(135deg,#a0e8da,#7ddccb)}
-.quick-btn.out{background:linear-gradient(135deg,#c88787,#d9a0a0)}
+.quick-btn.in{background:linear-gradient(135deg,#7E8E76,#A3B29A)}
+.quick-btn.out{background:linear-gradient(135deg,#A04A42,#C58B84)}
 .quick-btn .qa-icon{font-size:26px;margin-bottom:4px}
 .quick-btn .qa-title{font-size:15px;font-weight:600;margin-bottom:2px}
 .quick-btn .qa-sub{font-size:11px;opacity:.9}
@@ -85,10 +87,10 @@ header{background:linear-gradient(135deg,#ffc9ca 0%,#ffe8e8 100%);color:#6b4c5a;
 .stat-icon{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
 .stat-icon.blue{background:var(--primary-light);color:var(--primary)}
 .stat-icon.green{background:var(--success-light);color:var(--success)}
-.stat-icon.purple{background:#ffe8e8;color:#c88787}
+.stat-icon.purple{background:#F5E6E0;color:#A04A42}
 .stat-icon.orange{background:var(--warning-light);color:var(--warning)}
 .stat-icon.red{background:var(--danger-light);color:var(--danger)}
-.stat-icon.teal{background:#f0fdfa;color:#14b8a6}
+.stat-icon.teal{background:#EDE8F2;color:#7F6D8F}
 .stat-info .label{font-size:11px;color:var(--muted)}
 .stat-info .value{font-size:17px;font-weight:700}
 .stat-info .sub{font-size:10px;color:var(--muted)}
@@ -98,8 +100,8 @@ header{background:linear-gradient(135deg,#ffc9ca 0%,#ffe8e8 100%);color:#6b4c5a;
 .panel-header h2{font-size:15px;font-weight:600}
 .panel-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 
-.category-detail-header{background:linear-gradient(135deg,#ffc9ca,#ffe8e8);color:#6b4c5a;padding:20px;border-radius:var(--radius);margin-bottom:16px;position:relative}
-.category-detail-header .cd-back{background:rgba(255,255,255,.4);color:#6b4c5a}
+.category-detail-header{background:linear-gradient(135deg,#AF7C73,#F5E6E0);color:#481F19;padding:20px;border-radius:var(--radius);margin-bottom:16px;position:relative}
+.category-detail-header .cd-back{background:rgba(255,255,255,.4);color:#481F19}
 .category-detail-header .cd-back:hover{background:rgba(255,255,255,.6)}
 .category-detail-header .cd-name{font-size:22px;font-weight:700;margin-bottom:6px;padding-left:36px}
 .category-detail-header .cd-meta{font-size:13px;opacity:.9;padding-left:36px}
@@ -111,29 +113,29 @@ header{background:linear-gradient(135deg,#ffc9ca 0%,#ffe8e8 100%);color:#6b4c5a;
 .sku-card:hover{transform:translateY(-2px);border-color:var(--primary)}
 .sku-card .sku-name{font-size:13px;font-weight:600;margin-bottom:2px}
 .sku-card .sku-stock{font-size:22px;font-weight:800;margin:4px 0}
-.sku-card .sku-stock.normal{color:#5ac4b4}
-.sku-card .sku-stock.low{color:#c68a3e}
-.sku-card .sku-stock.out{color:#c88787}
+.sku-card .sku-stock.normal{color:#7E8E76}
+.sku-card .sku-stock.low{color:#C68A4A}
+.sku-card .sku-stock.out{color:#A04A42}
 .sku-card .sku-btns{display:flex;gap:4px;margin-top:8px}
 .sku-card .sku-btns .btn{padding:5px 8px;font-size:12px;border-radius:6px}
 
 .btn{padding:7px 13px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:500;transition:all .15s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
 .btn-primary{background:var(--primary);color:#fff}
-.btn-primary:hover{background:#4338ca}
+.btn-primary:hover{background:#8B4C42}
 .btn-success{background:var(--success);color:#fff}
-.btn-success:hover{background:#7ddccb}
+.btn-success:hover{background:#6A7B64}
 .btn-danger{background:var(--danger);color:#fff}
-.btn-danger:hover{background:#b06e6e}
+.btn-danger:hover{background:#7A3530}
 .btn-outline{background:#fff;border:1px solid var(--border);color:var(--text)}
-.btn-outline:hover{background:#f9fafb;border-color:#d1d5db}
+.btn-outline:hover{background:#FDF8F4;border-color:#E0CFC6}
 .btn-sm{padding:5px 10px;font-size:12px}
 
 .table-wrap{overflow-x:auto}
 .table-wrap tfoot td{background:var(--primary-light);font-weight:600;color:var(--text);border-top:2px solid var(--primary);padding:10px 12px;font-size:13px}
 table{width:100%;border-collapse:collapse;font-size:13px}
-thead th{background:#f9fafb;padding:9px 12px;text-align:left;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;top:0}
-tbody td{padding:8px 12px;border-bottom:1px solid #f3f4f6;vertical-align:middle}
-tbody tr:hover{background:#fafbfc}
+thead th{background:#FDF8F4;padding:9px 12px;text-align:left;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;top:0}
+tbody td{padding:8px 12px;border-bottom:1px solid #F7EFEA;vertical-align:middle}
+tbody tr:hover{background:#FAF5F1}
 tbody tr:last-child td{border-bottom:none}
 .text-right{text-align:right}
 .text-center{text-align:center}
@@ -142,9 +144,9 @@ tbody tr:last-child td{border-bottom:none}
 .text-danger{color:var(--danger)}
 .text-warning{color:var(--warning)}
 .tag{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:500}
-.tag-normal{background:#e3f9f4;color:#5ac4b4}
-.tag-low{background:#fcf3e6;color:#c68a3e}
-.tag-out-stock{background:#f5e3e3;color:#c88787}
+.tag-normal{background:#EEF2EB;color:#7E8E76}
+.tag-low{background:#F9F0E6;color:#C68A4A}
+.tag-out-stock{background:#F7EAE8;color:#A04A42}
 
 .filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .filters input,.filters select{padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:#fff;outline:none;transition:border .2s}
@@ -156,7 +158,7 @@ tbody tr:last-child td{border-bottom:none}
 .modal-header{padding:13px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff;z-index:1}
 .modal-header h3{font-size:15px;font-weight:600}
 .modal-close{background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);padding:0;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:6px}
-.modal-close:hover{background:#f3f4f6}
+.modal-close:hover{background:#F7EFEA}
 .modal-body{padding:16px}
 .modal-footer{padding:12px 16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;position:sticky;bottom:0;background:#fff}
 
@@ -172,7 +174,7 @@ tbody tr:last-child td{border-bottom:none}
 .empty{text-align:center;padding:32px 20px;color:var(--muted)}
 .empty .icon{font-size:36px;margin-bottom:8px;opacity:.5}
 
-.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(100px);background:#6b4c5a;color:#fff;padding:9px 18px;border-radius:8px;font-size:13px;z-index:2000;opacity:0;transition:all .3s;box-shadow:0 4px 12px rgba(200,135,135,.2)}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(100px);background:#481F19;color:#fff;padding:9px 18px;border-radius:8px;font-size:13px;z-index:2000;opacity:0;transition:all .3s;box-shadow:0 4px 12px rgba(160,74,66,.2)}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 .toast.success{background:var(--success)}
 .toast.error{background:var(--danger)}
@@ -191,21 +193,21 @@ tbody tr:last-child td{border-bottom:none}
 <body>
 
 <!-- 登录页面 -->
-<div id="loginPage" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#d0f9f1,#ffc9ca);z-index:9999;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:20px;padding:40px 32px;box-shadow:0 8px 32px rgba(107,76,90,.15);width:320px;text-align:center">
+<div id="loginPage" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#F5E6E0,#AF7C73);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:20px;padding:40px 32px;box-shadow:0 8px 32px rgba(72,31,25,.15);width:320px;text-align:center">
     <div style="font-size:48px;margin-bottom:8px">📦</div>
-    <h2 style="color:#6b4c5a;margin-bottom:6px;font-size:20px">周边库存管理工作台</h2>
-    <p style="color:#a88890;font-size:12px;margin-bottom:24px">请登录后使用</p>
+    <h2 style="color:#481F19;margin-bottom:6px;font-size:20px">周边库存管理工作台</h2>
+    <p style="color:#9A7E74;font-size:12px;margin-bottom:24px">请登录后使用</p>
     <div style="text-align:left;margin-bottom:16px">
-      <label style="display:block;font-size:13px;color:#6b4c5a;margin-bottom:4px">账号</label>
-      <input type="text" id="loginUser" placeholder="请输入账号" style="width:100%;padding:10px 14px;border:1px solid #ffc9ca;border-radius:10px;font-size:14px;outline:none;background:#fffafa" onkeydown="if(event.key==='Enter')document.getElementById('loginPass').focus()">
+      <label style="display:block;font-size:13px;color:#481F19;margin-bottom:4px">账号</label>
+      <input type="text" id="loginUser" placeholder="请输入账号" style="width:100%;padding:10px 14px;border:1px solid #AF7C73;border-radius:10px;font-size:14px;outline:none;background:#FFF8F5" onkeydown="if(event.key==='Enter')document.getElementById('loginPass').focus()">
     </div>
     <div style="text-align:left;margin-bottom:20px">
-      <label style="display:block;font-size:13px;color:#6b4c5a;margin-bottom:4px">密码</label>
-      <input type="password" id="loginPass" placeholder="请输入密码" style="width:100%;padding:10px 14px;border:1px solid #ffc9ca;border-radius:10px;font-size:14px;outline:none;background:#fffafa" onkeydown="if(event.key==='Enter')doLogin()">
+      <label style="display:block;font-size:13px;color:#481F19;margin-bottom:4px">密码</label>
+      <input type="password" id="loginPass" placeholder="请输入密码" style="width:100%;padding:10px 14px;border:1px solid #AF7C73;border-radius:10px;font-size:14px;outline:none;background:#FFF8F5" onkeydown="if(event.key==='Enter')doLogin()">
     </div>
-    <button onclick="doLogin()" style="width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#ffc9ca,#f4deda);color:#6b4c5a;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .2s">登 录</button>
-    <p id="loginError" style="color:#c88787;font-size:12px;margin-top:12px;height:14px"></p>
+    <button onclick="doLogin()" style="width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#AF7C73,#C9A99F);color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .2s">登 录</button>
+    <p id="loginError" style="color:#A04A42;font-size:12px;margin-top:12px;height:14px"></p>
   </div>
 </div>
 
@@ -220,9 +222,9 @@ tbody tr:last-child td{border-bottom:none}
       <button onclick="document.getElementById('importFile').click()">⬆️ 导入</button>
       <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
       <button onclick="openExportModal('excel')">📊 Excel</button>
-      <button onclick="clearAllData()" style="background:rgba(200,135,135,.2)">🗑️ 清空</button>
-      <button onclick="addToHomeScreen()" style="background:rgba(255,201,202,.3)">📱 添加桌面</button>
-      <button onclick="logout()" style="background:rgba(200,135,135,.2)">🚪 退出</button>
+      <button onclick="clearAllData()" style="background:rgba(160,74,66,.2)">🗑️ 清空</button>
+      <button onclick="addToHomeScreen()" style="background:rgba(175,124,115,.3)">📱 添加桌面</button>
+      <button onclick="logout()" style="background:rgba(160,74,66,.2)">🚪 退出</button>
     </div>
   </div>
 </header>
@@ -432,7 +434,7 @@ tbody tr:last-child td{border-bottom:none}
         <div class="form-group"><label>入库日期时间</label><input type="datetime-local" id="inDate"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>入库人</label><div id="inOperatorDisplay" style="padding:9px 12px;background:#f3f4f6;border-radius:8px;font-weight:600;color:var(--primary)">—</div><input type="hidden" id="inOperator"></div>
+        <div class="form-group"><label>入库人</label><div id="inOperatorDisplay" style="padding:9px 12px;background:#F7EFEA;border-radius:8px;font-weight:600;color:var(--primary)">—</div><input type="hidden" id="inOperator"></div>
         <div class="form-group"><label>采购日期</label><input type="date" id="inPurchaseDate"></div>
       </div>
       <div class="form-group"><label>备注</label><textarea id="inNotes" placeholder="采购批次、备注等"></textarea></div>
@@ -457,7 +459,7 @@ tbody tr:last-child td{border-bottom:none}
       </div>
       <div class="form-row">
         <div class="form-group"><label>出库渠道</label><select id="outSalesChannel"><option value="">—</option><option value="微店">微店</option><option value="闲鱼">闲鱼</option><option value="抖音">抖音</option><option value="微信">微信</option><option value="线下">线下</option></select></div>
-        <div class="form-group"><label>出库登记人</label><div id="outOperatorDisplay" style="padding:9px 12px;background:#f3f4f6;border-radius:8px;font-weight:600;color:var(--primary)">—</div><input type="hidden" id="outOperator"></div>
+        <div class="form-group"><label>出库登记人</label><div id="outOperatorDisplay" style="padding:9px 12px;background:#F7EFEA;border-radius:8px;font-weight:600;color:var(--primary)">—</div><input type="hidden" id="outOperator"></div>
       </div>
       <div class="form-group"><label>备注</label><textarea id="outNotes" placeholder="备注信息"></textarea></div>
       <div id="outStockWarn" style="display:none" class="text-danger"></div>
@@ -655,14 +657,14 @@ function renderAll(){
     items.forEach((p,i)=>{
       const stock=calcStock(p.id);const status=getStatus(p);
       const tag=status==='out'?`<span class="tag tag-out-stock">缺货</span>`:status==='low'?`<span class="tag tag-low">偏低</span>`:`<span class="tag tag-normal">正常</span>`;
-      html+=`<tr ${i===0?'style="border-top:2px solid #e5e7eb"':''}>
-        ${i===0?`<td rowspan="${items.length}" style="vertical-align:middle;background:#fafbfc;font-weight:600">${escapeHtml(cat)}</td>`:''}
+      html+=`<tr ${i===0?'style="border-top:2px solid #EDDCD2"':''}>
+        ${i===0?`<td rowspan="${items.length}" style="vertical-align:middle;background:#FAF5F1;font-weight:600">${escapeHtml(cat)}</td>`:''}
         <td>${escapeHtml(p.sku)}</td>
         <td class="text-right">${p.purchasePrice?fmtMoney(p.purchasePrice):'—'}</td>
         <td class="text-right"><strong>${fmt(stock)}</strong></td>
         <td class="text-right text-muted">${fmtMoney(stock*(p.purchasePrice||0))}</td>
         <td class="text-center">${tag}</td>
-        ${i===0?`<td rowspan="${items.length}" style="vertical-align:middle;background:#fafbfc">${escapeHtml(p.location)||'—'}</td>`:''}
+        ${i===0?`<td rowspan="${items.length}" style="vertical-align:middle;background:#FAF5F1">${escapeHtml(p.location)||'—'}</td>`:''}
       </tr>`;
     });
   });
@@ -678,7 +680,7 @@ function renderCategoryDetail(cat){
   document.getElementById('categoryDetailHeader').innerHTML=`<button class="cd-back" onclick="navTo('home')" title="返回">‹</button><div style="display:flex;justify-content:space-between;align-items:flex-start"><div class="cd-name">${escapeHtml(cat)}</div><div style="display:flex;gap:8px"><button class="btn btn-outline btn-sm" onclick="navTo('person-stock','${escapeHtml(cat)}')">👤 按人库存</button><button class="btn btn-primary btn-sm" onclick="navTo('expected','${escapeHtml(cat)}')">📋 到货表</button></div></div><div class="cd-meta">总库存：${fmt(total)} 件 | 库存价值：${fmtMoney(totalValue)} | 分类：${escapeHtml(p.location)||'—'}</div>`;
   document.getElementById('categoryDetailGrid').innerHTML=items.map(p=>{
     const stock=calcStock(p.id);const status=getStatus(p);
-    const color=status==='out'?'#c88787':status==='low'?'#e5a85e':'#5ac4b4';
+    const color=status==='out'?'#A04A42':status==='low'?'#C68A4A':'#7E8E76';
     return `<div class="sku-card" onclick="openSkuActionModal('${escapeHtml(cat)}','${escapeHtml(p.sku)}')">
       <div class="sku-name">${escapeHtml(p.sku)}</div>
       <div class="sku-stock ${status}" style="color:${color}">${fmt(stock)}</div>
