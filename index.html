@@ -533,6 +533,7 @@ const today=()=>new Date().toISOString().slice(0,10);
 const nowTime=()=>{const d=new Date();const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;};
 const toDatetimeLocal=()=>{const d=new Date();const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;};
 const fmtDate=s=>{if(!s)return '—';if(s.length===10)return s;return s.replace('T',' ').slice(0,19);};
+const fmtDateCell=s=>{if(!s)return '—';if(s.length===10)return `<div>${s}</div>`;const dt=s.replace('T',' ').slice(0,19);const [d,t]=dt.split(' ');return `<div>${d}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${t||'—'}</div>`;};
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 function toast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show '+type;setTimeout(()=>t.className='toast '+type,2500)}
 function escapeHtml(s){return(s||'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -712,7 +713,7 @@ function renderCategoryDetail(cat){
   const pagedTxs=txs.slice(startIdx,startIdx+TX_PAGE_SIZE);
   const txBody=document.getElementById('categoryTxBody');
   if(totalCount===0){txBody.innerHTML=`<tr><td colspan="6"><div class="empty">暂无流水</div></td></tr>`;return;}
-  let rows=pagedTxs.map(t=>{const prod=getProduct(t.productId);const isIn=t.type==='in';return `<tr><td class="nowrap">${fmtDate(t.date)}</td><td>${escapeHtml(prod.sku)}</td><td class="text-center"><span class="tag ${isIn?'tag-normal':'tag-out-stock'}">${isIn?'入库':'出库'}</span></td><td class="text-right ${isIn?'text-success':'text-danger'}"><strong>${isIn?'+':'-'}${fmt(t.qty)}</strong></td><td>${escapeHtml(t.operator)||'—'}</td><td class="text-muted">${escapeHtml(t.salesChannel||t.notes)||'—'}</td></tr>`;}).join('');
+  let rows=pagedTxs.map(t=>{const prod=getProduct(t.productId);const isIn=t.type==='in';return `<tr><td class="nowrap">${fmtDateCell(t.date)}</td><td>${escapeHtml(prod.sku)}</td><td class="text-center"><span class="tag ${isIn?'tag-normal':'tag-out-stock'}">${isIn?'入库':'出库'}</span></td><td class="text-right ${isIn?'text-success':'text-danger'}"><strong>${isIn?'+':'-'}${fmt(t.qty)}</strong></td><td>${escapeHtml(t.operator)||'—'}</td><td class="text-muted">${escapeHtml(t.salesChannel||t.notes)||'—'}</td></tr>`;}).join('');
   if(totalPages>1){
     let pager='<tr><td colspan="6"><div style="display:flex;justify-content:flex-end;align-items:center;gap:6px;padding:8px 0"><span style="font-size:12px;color:var(--muted)">共 '+totalCount+' 条</span>';
     for(let i=1;i<=totalPages;i++){
@@ -903,7 +904,7 @@ function renderInbound(){
   const body=document.getElementById('inboundBody');
   const foot=document.getElementById('inboundFoot');
   if(rows.length===0){body.innerHTML=`<tr><td colspan="9"><div class="empty">暂无入库记录</div></td></tr>`;foot.style.display='none';return;}
-  body.innerHTML=rows.map(t=>{const p=getProduct(t.productId);return `<tr><td class="nowrap">${fmtDate(t.date)}</td><td><strong>${p?escapeHtml(p.category):'—'}</strong></td><td>${p?escapeHtml(p.sku):'—'}</td><td class="text-right text-success"><strong>+${fmt(t.qty)}</strong></td><td class="text-right">${t.price?fmtMoney(t.price):'—'}</td><td class="text-right">${fmtMoney(t.qty*t.price)}</td><td>${escapeHtml(t.operator)||'—'}</td><td class="text-muted">${escapeHtml(t.notes)||'—'}</td><td class="text-center">${isAdmin()?`<button class="btn btn-outline btn-sm" onclick="deleteTransaction('${t.id}')">🗑️</button>`:'—'}</td></tr>`;}).join('');
+  body.innerHTML=rows.map(t=>{const p=getProduct(t.productId);return `<tr><td class="nowrap">${fmtDateCell(t.date)}</td><td><strong>${p?escapeHtml(p.category):'—'}</strong></td><td>${p?escapeHtml(p.sku):'—'}</td><td class="text-right text-success"><strong>+${fmt(t.qty)}</strong></td><td class="text-right">${t.price?fmtMoney(t.price):'—'}</td><td class="text-right">${fmtMoney(t.qty*t.price)}</td><td>${escapeHtml(t.operator)||'—'}</td><td class="text-muted">${escapeHtml(t.notes)||'—'}</td><td class="text-center">${isAdmin()?`<button class="btn btn-outline btn-sm" onclick="deleteTransaction('${t.id}')">🗑️</button>`:'—'}</td></tr>`;}).join('');
   const totalQty=rows.reduce((s,t)=>s+t.qty,0);
   const totalAmt=rows.reduce((s,t)=>s+t.qty*(t.price||0),0);
   document.getElementById('inTotalQty').textContent='+'+fmt(totalQty);
@@ -966,7 +967,7 @@ function renderOutbound(){
   const body=document.getElementById('outboundBody');
   const foot=document.getElementById('outboundFoot');
   if(rows.length===0){body.innerHTML=`<tr><td colspan="10"><div class="empty">暂无出库记录</div></td></tr>`;foot.style.display='none';return;}
-  body.innerHTML=rows.map(t=>{const p=getProduct(t.productId);return `<tr><td class="nowrap">${fmtDate(t.date)}</td><td><strong>${p?escapeHtml(p.category):'—'}</strong></td><td>${p?escapeHtml(p.sku):'—'}</td><td class="text-right text-danger"><strong>-${fmt(t.qty)}</strong></td><td class="text-right">${t.price?fmtMoney(t.price):'—'}</td><td class="text-right">${fmtMoney(t.qty*t.price)}</td><td>${escapeHtml(t.salesChannel)||'—'}</td><td>${escapeHtml(t.operator)||'—'}</td><td class="text-muted">${escapeHtml(t.notes)||'—'}</td><td class="text-center">${isAdmin()?`<button class="btn btn-outline btn-sm" onclick="deleteTransaction('${t.id}')">🗑️</button>`:'—'}</td></tr>`;}).join('');
+  body.innerHTML=rows.map(t=>{const p=getProduct(t.productId);return `<tr><td class="nowrap">${fmtDateCell(t.date)}</td><td><strong>${p?escapeHtml(p.category):'—'}</strong></td><td>${p?escapeHtml(p.sku):'—'}</td><td class="text-right text-danger"><strong>-${fmt(t.qty)}</strong></td><td class="text-right">${t.price?fmtMoney(t.price):'—'}</td><td class="text-right">${fmtMoney(t.qty*t.price)}</td><td>${escapeHtml(t.salesChannel)||'—'}</td><td>${escapeHtml(t.operator)||'—'}</td><td class="text-muted">${escapeHtml(t.notes)||'—'}</td><td class="text-center">${isAdmin()?`<button class="btn btn-outline btn-sm" onclick="deleteTransaction('${t.id}')">🗑️</button>`:'—'}</td></tr>`;}).join('');
   const totalQty=rows.reduce((s,t)=>s+t.qty,0);
   const totalAmt=rows.reduce((s,t)=>s+t.qty*(t.price||0),0);
   document.getElementById('outTotalQty').textContent='-'+fmt(totalQty);
