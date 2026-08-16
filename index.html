@@ -315,12 +315,17 @@ tbody tr:last-child td{border-bottom:none}
       </div>
     </div>
 
-    <!-- 收益分析总览页 -->
+    <!-- 收益分析仪表盘 -->
     <div id="page-profit" class="page" style="display:none">
       <div class="category-detail-header" id="profitHeader"></div>
+      <div class="stats" id="profitKpi"></div>
       <div class="panel">
-        <div class="panel-header"><h2>💰 收益分析 · 各大类</h2><span style="font-size:12px;color:var(--muted)">仅统计已卖出（出库）的货品</span></div>
-        <div class="table-wrap"><table><thead><tr><th>大类</th><th class="text-right">卖出数量</th><th class="text-right">销售收入</th><th class="text-right">卖出成本</th><th class="text-right">毛利</th><th class="text-right">毛利率</th><th class="text-center">操作</th></tr></thead><tbody id="profitOverviewBody"></tbody></table></div>
+        <div class="panel-header"><h2>💰 各大类毛利榜</h2><span style="font-size:12px;color:var(--muted)">仅统计已卖出（出库）的货品</span></div>
+        <div class="table-wrap"><table><thead><tr><th>大类</th><th class="text-right">销售收入</th><th class="text-right">毛利</th><th class="text-right">毛利率</th><th style="width:30%">毛利占比</th></tr></thead><tbody id="profitCatBody"></tbody></table></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><h2>📦 剩余库存积压时间看板</h2><span style="font-size:12px;color:var(--muted)">按近30天销售速度估算可卖天数</span></div>
+        <div class="table-wrap"><table><thead><tr><th>大类</th><th>SKU</th><th class="text-right">剩余库存</th><th class="text-right">近30天销量</th><th class="text-right">日均销量</th><th class="text-right">预估可卖天数</th><th class="text-center">状态</th></tr></thead><tbody id="profitBacklogBody"></tbody></table></div>
       </div>
     </div>
 
@@ -1125,27 +1130,78 @@ function computeProfit(cat){
     return {sku:p.sku,soldQty,revenue,cost,profit,margin:revenue>0?profit/revenue:0};
   }).filter(d=>d.soldQty>0).sort((a,b)=>b.profit-a.profit);
 }
+function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function last30OutQty(pid,channel){
+  const cut=new Date();cut.setDate(cut.getDate()-30);const cs=ymd(cut);
+  return state.transactions.filter(t=>t.type==='out'&&t.productId===pid&&(t.date||'').slice(0,10)>=cs&&(!channel||t.salesChannel===channel)).reduce((a,t)=>a+t.qty,0);
+}
+function backlogStatus(days,hasSales){
+  if(!hasSales)return {label:'零销售',color:'var(--danger)'};
+  if(days>=90)return {label:'积压',color:'var(--danger)'};
+  if(days>=60)return {label:'偏慢',color:'var(--warning)'};
+  if(days>=30)return {label:'正常',color:'var(--primary)'};
+  return {label:'周转快',color:'var(--success)'};
+}
 function renderProfit(){
-  document.getElementById('profitHeader').innerHTML=`<button class="cd-back" onclick="navTo('home')" title="返回">‹</button><div class="cd-name">💰 收益分析</div><div class="cd-meta">仅统计已卖出（出库）的货品，新出库自动计入</div>`;
-  const body=document.getElementById('profitOverviewBody');
+  const f=profitFilter;
+  const fdesc=(f.start||f.end||f.channel)?` · 筛选：${f.start||'最早'} ~ ${f.end||'最晚'}${f.channel?' · '+f.channel:''}`:'';
+  document.getElementById('profitHeader').innerHTML=`<button class="cd-back" onclick="navTo('home')" title="返回">‹</button><div class="cd-name">💰 收益分析</div><div class="cd-meta">仅统计已卖出（出库）的货品${escapeHtml(fdesc)}</div><button class="btn btn-outline btn-sm" style="position:absolute;top:18px;right:16px;background:rgba(255,255,255,.5);border-color:rgba(255,255,255,.7);color:#481F19" onclick="openProfitFilterModal()">🔍 筛选</button>`;
   const cats=getCategories();
-  if(cats.length===0){body.innerHTML=`<tr><td colspan="7"><div class="empty">暂无大类</div></td></tr>`;return;}
+  // KPI + 各大类毛利榜
   let g={soldQty:0,revenue:0,cost:0,profit:0};
-  body.innerHTML=cats.map(cat=>{
+  const rows=cats.map(cat=>{
     const agg=computeProfit(cat).reduce((s,x)=>({soldQty:s.soldQty+x.soldQty,revenue:s.revenue+x.revenue,cost:s.cost+x.cost,profit:s.profit+x.profit}),{soldQty:0,revenue:0,cost:0,profit:0});
     g.soldQty+=agg.soldQty;g.revenue+=agg.revenue;g.cost+=agg.cost;g.profit+=agg.profit;
-    const m=agg.revenue>0?agg.profit/agg.revenue:0;
-    const has=agg.soldQty>0;
-    return `<tr style="cursor:pointer" onclick="navTo('profit-detail','${escapeHtml(cat)}')">
-      <td><strong>${escapeHtml(cat)}</strong></td>
-      <td class="text-right">${has?fmt(agg.soldQty):'—'}</td>
-      <td class="text-right">${has?fmtMoney(agg.revenue):'—'}</td>
-      <td class="text-right">${has?fmtMoney(agg.cost):'—'}</td>
-      <td class="text-right"><strong style="color:${agg.profit>=0?'var(--success)':'var(--danger)'}">${has?fmtMoney(agg.profit):'—'}</strong></td>
-      <td class="text-right">${has?(m*100).toFixed(1)+'%':'—'}</td>
-      <td class="text-center"><button class="btn btn-sm btn-outline" onclick="event.stopPropagation();navTo('profit-detail','${escapeHtml(cat)}')">查看</button></td>
-    </tr>`;
-  }).join('')+(()=>{const gm=g.revenue>0?g.profit/g.revenue:0;return `<tr style="font-weight:600;background:var(--primary-light)"><td>合计</td><td class="text-right">${fmt(g.soldQty)}</td><td class="text-right">${fmtMoney(g.revenue)}</td><td class="text-right">${fmtMoney(g.cost)}</td><td class="text-right" style="color:${g.profit>=0?'var(--success)':'var(--danger)'}">${fmtMoney(g.profit)}</td><td class="text-right">${(gm*100).toFixed(1)}%</td><td></td></tr>`;})();
+    return {cat,agg};
+  });
+  const gm=g.revenue>0?g.profit/g.revenue:0;
+  document.getElementById('profitKpi').innerHTML=`
+    <div class="stat-card"><div class="stat-icon purple">💰</div><div class="stat-info"><div class="label">总销售收入</div><div class="value">${fmtMoney(g.revenue)}</div></div></div>
+    <div class="stat-card"><div class="stat-icon green">📈</div><div class="stat-info"><div class="label">总毛利</div><div class="value" style="color:${g.profit>=0?'var(--success)':'var(--danger)'}">${fmtMoney(g.profit)}</div></div></div>
+    <div class="stat-card"><div class="stat-icon blue">%</div><div class="stat-info"><div class="label">整体毛利率</div><div class="value">${(gm*100).toFixed(1)}%</div></div></div>
+    <div class="stat-card"><div class="stat-icon orange">📦</div><div class="stat-info"><div class="label">总卖出数量</div><div class="value">${fmt(g.soldQty)}</div></div></div>`;
+  const catBody=document.getElementById('profitCatBody');
+  if(rows.length===0){catBody.innerHTML=`<tr><td colspan="5"><div class="empty"><div class="icon">📊</div>暂无销售数据</div></td></tr>`;}
+  else{
+    catBody.innerHTML=rows.sort((a,b)=>b.agg.profit-a.agg.profit).map(r=>{
+      const a=r.agg;const has=a.soldQty>0;const m=a.revenue>0?a.profit/a.revenue:0;
+      const pct=g.profit>0?Math.max(0,a.profit/g.profit*100):0;
+      return `<tr style="cursor:pointer" onclick="navTo('profit-detail','${escapeHtml(r.cat)}')">
+        <td><strong>${escapeHtml(r.cat)}</strong></td>
+        <td class="text-right">${has?fmtMoney(a.revenue):'—'}</td>
+        <td class="text-right"><strong style="color:${a.profit>=0?'var(--success)':'var(--danger)'}">${has?fmtMoney(a.profit):'—'}</strong></td>
+        <td class="text-right">${has?(m*100).toFixed(1)+'%':'—'}</td>
+        <td><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:8px;background:var(--primary-light);border-radius:4px;overflow:hidden"><div style="height:100%;width:${pct.toFixed(1)}%;background:var(--primary);border-radius:4px"></div></div><span style="font-size:11px;color:var(--muted);min-width:40px;text-align:right">${has?pct.toFixed(1)+'%':'—'}</span></div></td>
+      </tr>`;
+    }).join('')+`<tr style="font-weight:600;background:var(--primary-light)"><td>合计</td><td class="text-right">${fmtMoney(g.revenue)}</td><td class="text-right" style="color:${g.profit>=0?'var(--success)':'var(--danger)'}">${fmtMoney(g.profit)}</td><td class="text-right">${(gm*100).toFixed(1)}%</td><td></td></tr>`;
+  }
+  // 剩余库存积压时间看板（按近30天销售速度估算可卖天数）
+  const backlog=[];
+  state.products.forEach(p=>{
+    const stock=calcStock(p.id);
+    if(stock<=0)return;
+    const sold30=last30OutQty(p.id,f.channel);
+    const avg=sold30/30;
+    const days=avg>0?stock/avg:Infinity;
+    backlog.push({cat:p.category,sku:p.sku,stock,sold30,avg,days,st:backlogStatus(days,avg>0)});
+  });
+  backlog.sort((a,b)=>b.days-a.days);
+  const blBody=document.getElementById('profitBacklogBody');
+  if(backlog.length===0){blBody.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="icon">📦</div>暂无剩余库存</div></td></tr>`;}
+  else{
+    blBody.innerHTML=backlog.map(r=>{
+      const daysTxt=r.days===Infinity?'∞':Math.round(r.days)+' 天';
+      return `<tr style="cursor:pointer" onclick="navTo('profit-detail','${escapeHtml(r.cat)}')">
+        <td><strong>${escapeHtml(r.cat||'—')}</strong></td>
+        <td>${escapeHtml(r.sku)}</td>
+        <td class="text-right">${fmt(r.stock)}</td>
+        <td class="text-right">${fmt(r.sold30)}</td>
+        <td class="text-right">${r.avg.toFixed(1)}</td>
+        <td class="text-right"><strong>${daysTxt}</strong></td>
+        <td class="text-center"><span style="color:${r.st.color};font-weight:600">${r.st.label}</span></td>
+      </tr>`;
+    }).join('');
+  }
 }
 function renderProfitDetail(cat){
   const items=getProductsByCategory(cat);
@@ -1183,12 +1239,14 @@ function applyProfitFilter(){
   profitFilter.end=document.getElementById('profitFilterEnd').value;
   profitFilter.channel=document.getElementById('profitFilterChannel').value;
   closeModal('profitFilterModal');
-  renderProfitDetail(currentCategory);
+  if(document.getElementById('page-profit').style.display!=='none')renderProfit();
+  else renderProfitDetail(currentCategory);
 }
 function resetProfitFilter(){
   profitFilter={start:'',end:'',channel:''};
   closeModal('profitFilterModal');
-  renderProfitDetail(currentCategory);
+  if(document.getElementById('page-profit').style.display!=='none')renderProfit();
+  else renderProfitDetail(currentCategory);
 }
 
 function closeModal(id){document.getElementById(id).classList.remove('show')}
