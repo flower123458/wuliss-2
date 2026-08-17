@@ -245,7 +245,6 @@ tbody tr:last-child td{border-bottom:none}
     <div class="nav-item" data-nav="all" onclick="navTo('all')"><span class="icon">📋</span><span>全部SKU</span><span class="badge" id="nav-all">0</span></div>
     <div class="nav-item" data-nav="inbound" onclick="navTo('inbound')"><span class="icon">📥</span><span>入库记录</span><span class="badge" id="nav-inbound">0</span></div>
     <div class="nav-item" data-nav="outbound" onclick="navTo('outbound')"><span class="icon">📤</span><span>出库记录</span><span class="badge" id="nav-outbound">0</span></div>
-    <div class="nav-item" data-nav="alert" onclick="navTo('alert')"><span class="icon">⚠️</span><span>库存预警</span><span class="badge" id="nav-alert">0</span></div>
     <div class="nav-item" data-nav="approve" onclick="navTo('approve')" id="navApprove" style="display:none"><span class="icon">✅</span><span>审批中心</span><span class="badge" id="nav-approve">0</span></div>
     <div class="nav-item" data-nav="profit" onclick="navTo('profit')"><span class="icon">💰</span><span>收益分析</span></div>
     <div class="nav-section-title collapsible" onclick="toggleCatNav()" title="展开 / 收起">商品大类 <span class="toggle-arrow" id="catNavArrow">▾</span></div>
@@ -382,14 +381,6 @@ tbody tr:last-child td{border-bottom:none}
           </div>
         </div>
         <div class="table-wrap"><table><thead><tr><th>日期</th><th>大类</th><th>SKU</th><th class="text-right">数量</th><th class="text-right">单价</th><th class="text-right">金额</th><th>出库渠道</th><th>出库人</th><th>备注</th><th class="text-center">操作</th></tr></thead><tbody id="outboundBody"></tbody><tfoot id="outboundFoot" style="display:none"><tr><td colspan="3">总计</td><td class="text-right" id="outTotalQty"></td><td></td><td class="text-right" id="outTotalAmount"></td><td colspan="4" class="text-muted" id="outTotalCount"></td></tr></tfoot></table></div>
-      </div>
-    </div>
-
-    <!-- 库存预警页 -->
-    <div id="page-alert" class="page" style="display:none">
-      <div class="panel">
-        <div class="panel-header"><h2>库存预警</h2><button class="btn btn-outline btn-sm" onclick="renderAlert()">🔄 刷新</button></div>
-        <div class="table-wrap"><table><thead><tr><th>大类</th><th>SKU</th><th class="text-right">当前库存</th><th class="text-right">安全库存</th><th class="text-right">缺口</th><th class="text-center">状态</th><th>分类</th></tr></thead><tbody id="alertBody"></tbody></table></div>
       </div>
     </div>
 
@@ -639,7 +630,6 @@ function navTo(page,cat){
   if(page==='all')renderAll();
   if(page==='inbound')renderInbound();
   if(page==='outbound')renderOutbound();
-    if(page==='alert')renderAlert();
     if(page==='category-detail'){currentCategory=cat;renderCategoryDetail(cat);}
     if(page==='expected')renderExpected();
     if(page==='person-stock'){currentCategory=cat;renderPersonStock(cat);}
@@ -711,7 +701,6 @@ function renderStatsBar(){
     {cls:'blue',icon:'📦',label:'商品大类',value:getCategories().length,sub:'个'},
     {cls:'green',icon:'📊',label:'总库存量',value:fmt(totalStock),sub:'件'},
     {cls:'purple',icon:'💰',label:'库存价值',value:fmtMoney(totalValue),sub:'按采购价'},
-    {cls:'orange',icon:'⚠️',label:'库存预警',value:low+out,sub:`低${low}/缺${out}`},
     {cls:'teal',icon:'📥',label:'累计入库',value:fmtMoney(inAmt),sub:`${state.transactions.filter(t=>t.type==='in').length}笔`},
     {cls:'red',icon:'📤',label:'累计出库',value:fmtMoney(outAmt),sub:`${state.transactions.filter(t=>t.type==='out').length}笔`},
   ];
@@ -719,7 +708,6 @@ function renderStatsBar(){
   document.getElementById('nav-all').textContent=state.products.length;
   document.getElementById('nav-inbound').textContent=state.transactions.filter(t=>t.type==='in').length;
   document.getElementById('nav-outbound').textContent=state.transactions.filter(t=>t.type==='out').length;
-  document.getElementById('nav-alert').textContent=low+out;
 }
 
 function renderHome(){
@@ -1165,17 +1153,6 @@ async function rejectRequest(reqId){
   try{await Cloud.deleteTransaction(reqId);await loadCloudData();toast('已拒绝','success');}catch(e){toast('操作失败','error');}
 }
 
-function renderAlert(){
-  const items=state.products.map(p=>({p,stock:calcStock(p.id),status:getStatus(p)})).filter(x=>x.status!=='normal').sort((a,b)=>a.status===b.status?a.stock-b.stock:(a.status==='out'?-1:1));
-  const body=document.getElementById('alertBody');
-  if(items.length===0){body.innerHTML=`<tr><td colspan="7"><div class="empty">所有库存正常</div></td></tr>`;return;}
-  body.innerHTML=items.map(({p,stock,status})=>{
-    const gap=stock<=0?(p.safetyStock||0):stock-(p.safetyStock||0);
-    const tag=status==='out'?`<span class="tag tag-out-stock">缺货</span>`:`<span class="tag tag-low">偏低</span>`;
-    return `<tr><td><strong>${escapeHtml(p.category||'')}</strong></td><td>${escapeHtml(p.sku)}</td><td class="text-right"><strong class="${status==='out'?'text-danger':'text-warning'}">${fmt(stock)}</strong></td><td class="text-right">${fmt(p.safetyStock||0)}</td><td class="text-right ${status==='out'?'text-danger':'text-warning'}">${status==='out'?'需补货':gap+'件'}</td><td class="text-center">${tag}</td><td>${escapeHtml(p.location)||'—'}</td></tr>`;
-  }).join('');
-}
-
 let exportFormat='json';
 function setExportFormat(fmt){exportFormat=fmt;document.getElementById('fmtJson').style.background=fmt==='json'?'var(--primary)':'rgba(0,0,0,.06)';document.getElementById('fmtJson').style.color=fmt==='json'?'#fff':'inherit';document.getElementById('fmtExcel').style.background=fmt==='excel'?'var(--primary)':'rgba(0,0,0,.06)';document.getElementById('fmtExcel').style.color=fmt==='excel'?'#fff':'inherit';}
 function openExportModal(fmt){exportFormat=fmt||'json';setExportFormat(exportFormat);document.getElementById('expStart').value='';document.getElementById('expEnd').value='';document.getElementById('exportModal').classList.add('show');}
@@ -1402,7 +1379,7 @@ function refresh(){
   const cactive=document.querySelector('.cat-item.active');
   if(cactive&&document.getElementById('page-category-detail').style.display!=='none'){renderCategoryDetail(currentCategory);return;}
   const page=active?active.dataset.nav:'home';
-  if(page==='home')renderHome();if(page==='all')renderAll();if(page==='inbound')renderInbound();if(page==='outbound')renderOutbound();if(page==='alert')renderAlert();if(page==='profit')renderProfit();if(page==='profit-detail')renderProfitDetail(currentCategory);if(page==='approve')renderApprove();
+  if(page==='home')renderHome();if(page==='all')renderAll();if(page==='inbound')renderInbound();if(page==='outbound')renderOutbound();if(page==='profit')renderProfit();if(page==='profit-detail')renderProfitDetail(currentCategory);if(page==='approve')renderApprove();
 }
 // ===== 登录系统 =====
 // 每个账号绑定一个固定操作人，登录后录入/录出自动带上该操作人，避免选错
