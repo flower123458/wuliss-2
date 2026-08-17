@@ -246,6 +246,7 @@ tbody tr:last-child td{border-bottom:none}
     <div class="nav-item" data-nav="inbound" onclick="navTo('inbound')"><span class="icon">📥</span><span>入库记录</span><span class="badge" id="nav-inbound">0</span></div>
     <div class="nav-item" data-nav="outbound" onclick="navTo('outbound')"><span class="icon">📤</span><span>出库记录</span><span class="badge" id="nav-outbound">0</span></div>
     <div class="nav-item" data-nav="alert" onclick="navTo('alert')"><span class="icon">⚠️</span><span>库存预警</span><span class="badge" id="nav-alert">0</span></div>
+    <div class="nav-item" data-nav="approve" onclick="navTo('approve')" id="navApprove" style="display:none"><span class="icon">✅</span><span>审批中心</span><span class="badge" id="nav-approve">0</span></div>
     <div class="nav-item" data-nav="profit" onclick="navTo('profit')"><span class="icon">💰</span><span>收益分析</span></div>
     <div class="nav-section-title collapsible" onclick="toggleCatNav()" title="展开 / 收起">商品大类 <span class="toggle-arrow" id="catNavArrow">▾</span></div>
     <div id="catNavList"></div>
@@ -391,6 +392,15 @@ tbody tr:last-child td{border-bottom:none}
         <div class="table-wrap"><table><thead><tr><th>大类</th><th>SKU</th><th class="text-right">当前库存</th><th class="text-right">安全库存</th><th class="text-right">缺口</th><th class="text-center">状态</th><th>分类</th></tr></thead><tbody id="alertBody"></tbody></table></div>
       </div>
     </div>
+
+    <!-- 审批中心（仅 11 可见） -->
+    <div id="page-approve" class="page" style="display:none">
+      <div class="category-detail-header" id="approveHeader"></div>
+      <div class="panel">
+        <div class="panel-header"><h2>✅ 审批中心</h2><span style="font-size:12px;color:var(--muted)">笋笋 / 小碗 提交的修改或删除申请</span></div>
+        <div class="table-wrap"><table><thead><tr><th>大类 / SKU</th><th>类型</th><th>申请内容</th><th>申请人</th><th class="text-muted">提交时间</th><th class="text-center">操作</th></tr></thead><tbody id="approveBody"></tbody></table></div>
+      </div>
+    </div>
   </main>
 </div>
 
@@ -512,6 +522,38 @@ tbody tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+<!-- 申请删除 Modal -->
+<div class="modal-overlay" id="reqDelModal">
+  <div class="modal">
+    <div class="modal-header"><h3>申请删除记录</h3><button class="modal-close" onclick="closeModal('reqDelModal')">×</button></div>
+    <div class="modal-body">
+      <p style="color:var(--muted);font-size:13px;margin-bottom:10px">提交后需由 <strong>11</strong> 审批通过才会真正删除。</p>
+      <div id="reqDelInfo" style="background:var(--primary-light);border-radius:8px;padding:12px;font-size:13px;line-height:1.8"></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('reqDelModal')">取消</button><button class="btn btn-danger" onclick="submitDelRequest(editReqTarget.id)">提交申请</button></div>
+  </div>
+</div>
+
+<!-- 申请修改 / 修改 Modal -->
+<div class="modal-overlay" id="editReqModal">
+  <div class="modal">
+    <div class="modal-header"><h3 id="editReqTitle">申请修改记录</h3><button class="modal-close" onclick="closeModal('editReqModal')">×</button></div>
+    <div class="modal-body">
+      <div class="form-row-3">
+        <div class="form-group"><label>数量 <span class="req">*</span></label><input type="number" id="editReqQty" min="1" placeholder="数量"></div>
+        <div class="form-group"><label>单价（元）</label><input type="number" id="editReqPrice" step="0.01" min="0" placeholder="单价"></div>
+        <div class="form-group"><label>日期时间</label><input type="datetime-local" id="editReqDate"></div>
+      </div>
+      <div class="form-row" id="editReqChannelWrap" style="display:none">
+        <div class="form-group"><label>出库渠道</label><select id="editReqChannel"><option value="">—</option><option value="微店">微店</option><option value="闲鱼">闲鱼</option><option value="抖音">抖音</option><option value="微信">微信</option><option value="线下">线下</option></select></div>
+      </div>
+      <div class="form-group"><label>备注</label><textarea id="editReqNotes" placeholder="备注"></textarea></div>
+      <p id="editReqHint" style="font-size:12px;color:var(--muted)"></p>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('editReqModal')">取消</button><button class="btn btn-primary" id="editReqSubmitBtn" onclick="submitEditRequest()">提交申请</button></div>
+  </div>
+</div>
+
 <!-- SKU 操作选择 Modal -->
 <div class="modal-overlay" id="skuActionModal">
   <div class="modal" style="max-width:320px;text-align:center">
@@ -556,6 +598,7 @@ const Cloud={
   async deleteProduct(id){await fetch(API_BASE+'/products_v2?id=eq.'+id,{method:'DELETE',headers:API_HEADERS});},
   async insertTransaction(t){return fetch(API_BASE+'/transactions_v2',{method:'POST',headers:API_HEADERS,body:JSON.stringify({id:t.id,type:t.type,product_id:t.productId,qty:t.qty,price:t.price||0,date:t.date,operator:t.operator||'',purchase_date:t.purchaseDate||'',sales_channel:t.salesChannel||'',notes:t.notes,created_at:t.createdAt})}).then(r=>r.json());},
   async deleteTransaction(id){await fetch(API_BASE+'/transactions_v2?id=eq.'+id,{method:'DELETE',headers:API_HEADERS});},
+  async updateTransaction(id,data){const body={qty:data.qty,price:data.price,date:data.date,operator:data.operator,notes:data.notes};if(data.salesChannel!==undefined)body.sales_channel=data.salesChannel;return fetch(API_BASE+'/transactions_v2?id=eq.'+id,{method:'PATCH',headers:API_HEADERS,body:JSON.stringify(body)}).then(r=>{if(!r.ok)throw new Error('update failed '+r.status);return r.json();});},
   async deleteAll(){await fetch(API_BASE+'/transactions_v2?id=neq.x',{method:'DELETE',headers:API_HEADERS});await fetch(API_BASE+'/products_v2?id=neq.x',{method:'DELETE',headers:API_HEADERS});}
 };
 
@@ -602,6 +645,7 @@ function navTo(page,cat){
     if(page==='person-stock'){currentCategory=cat;renderPersonStock(cat);}
     if(page==='profit')renderProfit();
     if(page==='profit-detail'){currentCategory=cat;renderProfitDetail(cat);}
+    if(page==='approve')renderApprove();
   if(window.innerWidth<=768){document.getElementById('sidebar').classList.remove('mobile-show');document.getElementById('overlay').classList.remove('show');}
 }
 function navToCategory(cat){navTo('category-detail',cat);}
@@ -654,6 +698,7 @@ async function loadCloudData(){
     state.products=data.products.map(p=>({id:p.id,name:p.name,sku:p.sku,category:p.category,location:p.location,purchasePrice:parseFloat(p.purchase_price)||0,safetyStock:p.safety_stock||0,expectedQty:parseInt(p.expected_qty)||0,notes:p.notes,createdAt:p.created_at}));
     state.transactions=data.transactions.map(t=>({id:t.id,type:t.type,productId:t.product_id,qty:t.qty,price:parseFloat(t.price)||0,date:t.date,operator:t.operator,purchaseDate:t.purchase_date,salesChannel:t.sales_channel,notes:t.notes,createdAt:t.created_at}));
     refresh();
+    updateApproveBadge();
   }catch(e){console.error(e);toast('加载数据失败，请检查网络','error');}
   document.getElementById('loadingOverlay').style.display='none';isLoading=false;
 }
@@ -948,7 +993,8 @@ function renderInbound(){
   const body=document.getElementById('inboundBody');
   const foot=document.getElementById('inboundFoot');
   if(rows.length===0){body.innerHTML=`<tr><td colspan="9"><div class="empty">暂无入库记录</div></td></tr>`;foot.style.display='none';return;}
-  body.innerHTML=rows.map(t=>{const p=getProduct(t.productId);return `<tr><td class="nowrap">${fmtDateCell(t.date)}</td><td><strong>${p?escapeHtml(p.category):'—'}</strong></td><td>${p?escapeHtml(p.sku):'—'}</td><td class="text-right text-success"><strong>+${fmt(t.qty)}</strong></td><td class="text-right">${t.price?fmtMoney(t.price):'—'}</td><td class="text-right">${fmtMoney(t.qty*t.price)}</td><td>${escapeHtml(t.operator)||'—'}</td><td class="text-muted">${escapeHtml(t.notes)||'—'}</td><td class="text-center">${isAdmin()?`<button class="btn btn-outline btn-sm" onclick="deleteTransaction('${t.id}')">🗑️</button>`:'—'}</td></tr>`;}).join('');
+  const pendingSet=new Set(getPendingRequests().map(x=>x.req.targetId));
+  body.innerHTML=rows.map(t=>{const p=getProduct(t.productId);return `<tr><td class="nowrap">${fmtDateCell(t.date)}</td><td><strong>${p?escapeHtml(p.category):'—'}</strong></td><td>${p?escapeHtml(p.sku):'—'}</td><td class="text-right text-success"><strong>+${fmt(t.qty)}</strong></td><td class="text-right">${t.price?fmtMoney(t.price):'—'}</td><td class="text-right">${fmtMoney(t.qty*t.price)}</td><td>${escapeHtml(t.operator)||'—'}</td><td class="text-muted">${escapeHtml(t.notes)||'—'}</td><td class="text-center">${txActionCell(t,pendingSet)}</td></tr>`;}).join('');
   const totalQty=rows.reduce((s,t)=>s+t.qty,0);
   const totalAmt=rows.reduce((s,t)=>s+t.qty*(t.price||0),0);
   document.getElementById('inTotalQty').textContent='+'+fmt(totalQty);
@@ -1011,7 +1057,8 @@ function renderOutbound(){
   const body=document.getElementById('outboundBody');
   const foot=document.getElementById('outboundFoot');
   if(rows.length===0){body.innerHTML=`<tr><td colspan="10"><div class="empty">暂无出库记录</div></td></tr>`;foot.style.display='none';return;}
-  body.innerHTML=rows.map(t=>{const p=getProduct(t.productId);return `<tr><td class="nowrap">${fmtDateCell(t.date)}</td><td><strong>${p?escapeHtml(p.category):'—'}</strong></td><td>${p?escapeHtml(p.sku):'—'}</td><td class="text-right text-danger"><strong>-${fmt(t.qty)}</strong></td><td class="text-right">${t.price?fmtMoney(t.price):'—'}</td><td class="text-right">${fmtMoney(t.qty*t.price)}</td><td>${escapeHtml(t.salesChannel)||'—'}</td><td>${escapeHtml(t.operator)||'—'}</td><td class="text-muted">${escapeHtml(t.notes)||'—'}</td><td class="text-center">${isAdmin()?`<button class="btn btn-outline btn-sm" onclick="deleteTransaction('${t.id}')">🗑️</button>`:'—'}</td></tr>`;}).join('');
+  const pendingSet=new Set(getPendingRequests().map(x=>x.req.targetId));
+  body.innerHTML=rows.map(t=>{const p=getProduct(t.productId);return `<tr><td class="nowrap">${fmtDateCell(t.date)}</td><td><strong>${p?escapeHtml(p.category):'—'}</strong></td><td>${p?escapeHtml(p.sku):'—'}</td><td class="text-right text-danger"><strong>-${fmt(t.qty)}</strong></td><td class="text-right">${t.price?fmtMoney(t.price):'—'}</td><td class="text-right">${fmtMoney(t.qty*t.price)}</td><td>${escapeHtml(t.salesChannel)||'—'}</td><td>${escapeHtml(t.operator)||'—'}</td><td class="text-muted">${escapeHtml(t.notes)||'—'}</td><td class="text-center">${txActionCell(t,pendingSet)}</td></tr>`;}).join('');
   const totalQty=rows.reduce((s,t)=>s+t.qty,0);
   const totalAmt=rows.reduce((s,t)=>s+t.qty*(t.price||0),0);
   document.getElementById('outTotalQty').textContent='-'+fmt(totalQty);
@@ -1020,6 +1067,103 @@ function renderOutbound(){
   foot.style.display='';
 }
 async function deleteTransaction(id){if(!isAdmin()){toast('仅管理员(11)可删除记录','error');return;}if(confirm('确定删除这条流水记录吗？')){try{await Cloud.deleteTransaction(id);await loadCloudData();toast('记录已删除','success');}catch(e){toast('删除失败','error');}}}
+
+/* ===== 审批流：笋笋/小碗申请，11 审批 ===== */
+let editReqTarget=null;
+function isReqRow(t){return t.type==='req_del'||t.type==='req_edit';}
+function parseReq(t){try{return JSON.parse(t.notes||'{}').req;}catch(e){return null;}}
+function getPendingRequests(){return state.transactions.filter(t=>isReqRow(t)).map(t=>({row:t,req:parseReq(t)})).filter(x=>x.req&&x.req.status==='pending');}
+function updateApproveBadge(){const n=getPendingRequests().length;const nav=document.getElementById('navApprove');const badge=document.getElementById('nav-approve');if(isAdmin()){nav.style.display='';badge.textContent=n;}else{nav.style.display='none';}}
+function txActionCell(t,pendingSet){
+  if(isAdmin()){return `<button class="btn btn-outline btn-sm" onclick="deleteTransaction('${t.id}')">🗑️</button> <button class="btn btn-outline btn-sm" onclick="openEditReqModal('${t.id}',true)">✏️</button>`;}
+  if(pendingSet.has(t.id))return `<span style="color:var(--warning);font-size:11px;font-weight:600">🟡 待审批</span>`;
+  return `<button class="btn btn-outline btn-sm" onclick="openReqDelModal('${t.id}')">申请删除</button> <button class="btn btn-outline btn-sm" onclick="openEditReqModal('${t.id}',false)">申请修改</button>`;
+}
+function openReqDelModal(id){
+  const t=state.transactions.find(x=>x.id===id);if(!t)return;const p=getProduct(t.productId);
+  editReqTarget={id};
+  document.getElementById('reqDelInfo').innerHTML=`大类：<strong>${p?escapeHtml(p.category):'—'}</strong> · SKU：${p?escapeHtml(p.sku):'—'}<br>数量：${t.type==='in'?'+':''}${fmt(t.qty)} 件 · 操作人：${escapeHtml(t.operator)||'—'}`;
+  document.getElementById('reqDelModal').classList.add('show');
+}
+function openEditReqModal(id,direct){
+  const t=state.transactions.find(x=>x.id===id);if(!t)return;
+  editReqTarget={id,type:t.type,direct:!!direct};
+  document.getElementById('editReqTitle').textContent=direct?'修改记录（管理员）':'申请修改记录';
+  document.getElementById('editReqHint').textContent=direct?'你是管理员，修改将立即生效。':'提交后需由 11 审批通过才会生效。';
+  document.getElementById('editReqQty').value=t.qty;
+  document.getElementById('editReqPrice').value=t.price||'';
+  document.getElementById('editReqDate').value=t.date?t.date.replace(' ','T').slice(0,16):'';
+  document.getElementById('editReqNotes').value=t.notes||'';
+  const chWrap=document.getElementById('editReqChannelWrap');
+  if(t.type==='out'){chWrap.style.display='';document.getElementById('editReqChannel').value=t.salesChannel||'';}
+  else{chWrap.style.display='none';}
+  document.getElementById('editReqModal').classList.add('show');
+}
+async function submitDelRequest(id){
+  const t=state.transactions.find(x=>x.id===id);if(!t){closeModal('reqDelModal');return;}
+  const req={action:'delete',targetId:id,targetType:t.type,by:currentOperator,at:Date.now(),status:'pending',original:{qty:t.qty,price:t.price,date:t.date,channel:t.salesChannel,notes:t.notes}};
+  const row={id:uid(),type:'req_del',productId:t.productId,operator:currentOperator,date:nowTime(),notes:JSON.stringify({req}),createdAt:Date.now()};
+  try{await Cloud.insertTransaction(row);await loadCloudData();closeModal('reqDelModal');toast('已提交删除申请，等待 11 审批','success');}
+  catch(e){toast('提交失败','error');}
+}
+async function submitEditRequest(){
+  const info=editReqTarget;if(!info){return;}
+  const t=state.transactions.find(x=>x.id===info.id);if(!t){closeModal('editReqModal');return;}
+  const qty=parseInt(document.getElementById('editReqQty').value)||0;
+  const price=parseFloat(document.getElementById('editReqPrice').value)||0;
+  const dateRaw=document.getElementById('editReqDate').value;
+  const dateStr=dateRaw?dateRaw.replace('T',' ')+':00':nowTime();
+  const channel=document.getElementById('editReqChannel')?document.getElementById('editReqChannel').value:'';
+  const notes=document.getElementById('editReqNotes').value.trim();
+  if(!qty||qty<=0){toast('请填写正确数量','error');return;}
+  const proposed={qty,price,date:dateStr,channel,notes};
+  if(info.direct){
+    try{const body={qty,price,date:dateStr,operator:t.operator,notes};if(t.type==='out')body.salesChannel=channel;await Cloud.updateTransaction(info.id,body);await loadCloudData();closeModal('editReqModal');toast('修改已保存','success');}catch(e){toast('修改失败','error');}
+    return;
+  }
+  const req={action:'edit',targetId:info.id,targetType:t.type,by:currentOperator,at:Date.now(),status:'pending',original:{qty:t.qty,price:t.price,date:t.date,channel:t.salesChannel,notes:t.notes},proposed};
+  const row={id:uid(),type:'req_edit',productId:t.productId,operator:currentOperator,date:nowTime(),notes:JSON.stringify({req}),createdAt:Date.now()};
+  try{await Cloud.insertTransaction(row);await loadCloudData();closeModal('editReqModal');toast('已提交修改申请，等待 11 审批','success');}
+  catch(e){toast('提交失败','error');}
+}
+function renderApprove(){
+  document.getElementById('approveHeader').innerHTML=`<div class="cd-name">✅ 审批中心</div><div class="cd-meta">仅 11 可审批；笋笋 / 小碗 提交的修改或删除申请在此处理</div>`;
+  const list=getPendingRequests();
+  document.getElementById('nav-approve').textContent=list.length;
+  const body=document.getElementById('approveBody');
+  if(list.length===0){body.innerHTML=`<tr><td colspan="6"><div class="empty"><div class="icon">✅</div>暂无待审批的申请</div></td></tr>`;return;}
+  body.innerHTML=list.map(({row,req})=>{
+    const t=state.transactions.find(x=>x.id===req.targetId);
+    const p=getProduct(t?t.productId:row.productId);
+    const cat=p?escapeHtml(p.category):'—';const sku=p?escapeHtml(p.sku):'—';
+    const tt=req.targetType==='out'?'出库':'入库';
+    let detail;
+    if(req.action==='delete'){detail=`申请 <b style="color:var(--danger)">删除</b> 该${tt}记录（${fmt(req.original.qty)} 件）`;}
+    else{const o=req.original,n=req.proposed;detail=`申请 <b style="color:var(--primary)">修改</b> 该${tt}记录：数量 ${fmt(o.qty)}→${fmt(n.qty)}，单价 ${fmtMoney(o.price)}→${fmtMoney(n.price)}`+(o.date!==n.date?'，日期已调整':'');}
+    const at=req.at?fmtDateCell(new Date(req.at).toISOString().slice(0,19).replace('T',' ')):'—';
+    return `<tr>
+      <td><strong>${cat}</strong><br><span class="text-muted">${sku}</span></td>
+      <td>${tt}</td>
+      <td>${detail}</td>
+      <td>${escapeHtml(req.by||'—')}</td>
+      <td class="text-muted">${at}</td>
+      <td class="text-center"><button class="btn btn-success btn-sm" onclick="approveRequest('${row.id}')">通过</button> <button class="btn btn-outline btn-sm" onclick="rejectRequest('${row.id}')">拒绝</button></td>
+    </tr>`;
+  }).join('');
+}
+async function approveRequest(reqId){
+  const row=state.transactions.find(x=>x.id===reqId);if(!row)return;const req=parseReq(row);if(!req)return;
+  if(!confirm('通过这条申请并执行？'))return;
+  try{
+    if(req.action==='delete'){await Cloud.deleteTransaction(req.targetId);}
+    else{const n=req.proposed;const target=state.transactions.find(x=>x.id===req.targetId);const body={qty:n.qty,price:n.price,date:n.date,notes:n.notes,operator:(target&&target.operator)||row.operator};if(target&&target.type==='out')body.salesChannel=n.channel;await Cloud.updateTransaction(req.targetId,body);}
+    await Cloud.deleteTransaction(reqId);await loadCloudData();toast('已通过并执行','success');
+  }catch(e){toast('操作失败','error');}
+}
+async function rejectRequest(reqId){
+  if(!confirm('拒绝这条申请？'))return;
+  try{await Cloud.deleteTransaction(reqId);await loadCloudData();toast('已拒绝','success');}catch(e){toast('操作失败','error');}
+}
 
 function renderAlert(){
   const items=state.products.map(p=>({p,stock:calcStock(p.id),status:getStatus(p)})).filter(x=>x.status!=='normal').sort((a,b)=>a.status===b.status?a.stock-b.stock:(a.status==='out'?-1:1));
@@ -1258,7 +1402,7 @@ function refresh(){
   const cactive=document.querySelector('.cat-item.active');
   if(cactive&&document.getElementById('page-category-detail').style.display!=='none'){renderCategoryDetail(currentCategory);return;}
   const page=active?active.dataset.nav:'home';
-  if(page==='home')renderHome();if(page==='all')renderAll();if(page==='inbound')renderInbound();if(page==='outbound')renderOutbound();if(page==='alert')renderAlert();if(page==='profit')renderProfit();if(page==='profit-detail')renderProfitDetail(currentCategory);
+  if(page==='home')renderHome();if(page==='all')renderAll();if(page==='inbound')renderInbound();if(page==='outbound')renderOutbound();if(page==='alert')renderAlert();if(page==='profit')renderProfit();if(page==='profit-detail')renderProfitDetail(currentCategory);if(page==='approve')renderApprove();
 }
 // ===== 登录系统 =====
 // 每个账号绑定一个固定操作人，登录后录入/录出自动带上该操作人，避免选错
@@ -1308,6 +1452,7 @@ function initApp(){
   applyCatNavCollapsedState();
   const btnClear=document.getElementById('btnClearAll');
   if(btnClear)btnClear.style.display=isAdmin()?'':'none';
+  const navApprove=document.getElementById('navApprove');if(navApprove)navApprove.style.display=isAdmin()?'':'none';
   renderStatsBar();renderCatNav();renderHome();
   loadCloudData();
   setInterval(()=>{loadCloudData();},30000);
