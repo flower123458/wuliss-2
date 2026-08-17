@@ -1102,7 +1102,7 @@ function openEditReqModal(id,direct){
 async function submitDelRequest(id){
   const t=state.transactions.find(x=>x.id===id);if(!t){closeModal('reqDelModal');return;}
   const req={action:'delete',targetId:id,targetType:t.type,by:currentOperator,at:Date.now(),status:'pending',original:{qty:t.qty,price:t.price,date:t.date,channel:t.salesChannel,notes:t.notes}};
-  const row={id:uid(),type:'req_del',productId:t.productId,operator:currentOperator,date:nowTime(),notes:JSON.stringify({req}),createdAt:Date.now()};
+  const row={id:uid(),type:'req_del',productId:t.productId,qty:t.qty,price:t.price||0,date:t.date||nowTime(),operator:currentOperator,purchaseDate:t.purchaseDate||'',salesChannel:t.salesChannel||'',notes:JSON.stringify({req}),createdAt:Date.now()};
   try{await Cloud.insertTransaction(row);await loadCloudData();closeModal('reqDelModal');toast('已提交删除申请，等待 11 审批','success');}
   catch(e){toast('提交失败','error');}
 }
@@ -1122,7 +1122,7 @@ async function submitEditRequest(){
     return;
   }
   const req={action:'edit',targetId:info.id,targetType:t.type,by:currentOperator,at:Date.now(),status:'pending',original:{qty:t.qty,price:t.price,date:t.date,channel:t.salesChannel,notes:t.notes},proposed};
-  const row={id:uid(),type:'req_edit',productId:t.productId,operator:currentOperator,date:nowTime(),notes:JSON.stringify({req}),createdAt:Date.now()};
+  const row={id:uid(),type:'req_edit',productId:t.productId,qty:t.qty,price:t.price||0,date:t.date||nowTime(),operator:currentOperator,purchaseDate:t.purchaseDate||'',salesChannel:t.salesChannel||'',notes:JSON.stringify({req}),createdAt:Date.now()};
   try{await Cloud.insertTransaction(row);await loadCloudData();closeModal('editReqModal');toast('已提交修改申请，等待 11 审批','success');}
   catch(e){toast('提交失败','error');}
 }
