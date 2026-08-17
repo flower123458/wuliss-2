@@ -523,10 +523,7 @@ tbody tr:last-child td{border-bottom:none}
         <div class="form-group"><label>采购单价（元）</label><input type="number" id="inPrice" step="0.01" min="0" placeholder="留空用默认价"></div>
         <div class="form-group"><label>入库日期时间</label><input type="datetime-local" id="inDate"></div>
       </div>
-      <div class="form-row">
-        <div class="form-group"><label>入库人</label><div id="inOperatorDisplay" style="padding:9px 12px;background:#F7EFEA;border-radius:8px;font-weight:600;color:var(--primary)">—</div><input type="hidden" id="inOperator"></div>
-        <div class="form-group"><label>采购日期</label><input type="date" id="inPurchaseDate"></div>
-      </div>
+      <div class="form-group"><label>入库人</label><div id="inOperatorDisplay" style="padding:9px 12px;background:#F7EFEA;border-radius:8px;font-weight:600;color:var(--primary)">—</div><input type="hidden" id="inOperator"></div>
       <div class="form-group"><label>备注</label><textarea id="inNotes" placeholder="采购批次、备注等"></textarea></div>
     </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('inboundModal')">取消</button><button class="btn btn-success" onclick="saveInbound()">确认入库</button></div>
@@ -988,7 +985,7 @@ function openInboundModal(prefillCat,prefillSku){
   fillInSku('inSku',prefillCat,prefillSku);
   document.getElementById('inQty').value='';
   const p=findProduct(prefillCat,prefillSku);document.getElementById('inPrice').value=p&&p.purchasePrice?p.purchasePrice:'';
-  document.getElementById('inDate').value=toDatetimeLocal();document.getElementById('inPurchaseDate').value=today();
+  document.getElementById('inDate').value=toDatetimeLocal();
   document.getElementById('inOperator').value=currentOperator||'11';document.getElementById('inOperatorDisplay').textContent=currentOperator||'11';document.getElementById('inNotes').value='';
   document.getElementById('inboundModal').classList.add('show');
 }
@@ -1021,7 +1018,7 @@ async function saveInbound(){
   const dateRaw=document.getElementById('inDate').value;
   const dateStr=dateRaw?dateRaw.replace('T',' ')+':00':nowTime();
   try{
-    await Cloud.insertTransaction({id:uid(),type:'in',productId:p.id,qty,price,date:dateStr,operator:document.getElementById('inOperator').value,purchaseDate:document.getElementById('inPurchaseDate').value||today(),notes:document.getElementById('inNotes').value.trim(),createdAt:Date.now()});
+    await Cloud.insertTransaction({id:uid(),type:'in',productId:p.id,qty,price,date:dateStr,operator:document.getElementById('inOperator').value,notes:document.getElementById('inNotes').value.trim(),createdAt:Date.now()});
     closeModal('inboundModal');await loadCloudData();
     toast(`入库成功：${cat} ${sku} +${qty}`,'success');
   }catch(e){toast('入库失败','error');}
