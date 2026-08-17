@@ -198,6 +198,15 @@ tbody tr:last-child td{border-bottom:none}
 .pending-approvals-item .type{font-weight:600;color:var(--text)}
 .pending-approvals-item .meta{color:var(--muted);font-size:11px;white-space:nowrap}
 .pending-approvals-footer{text-align:right;margin-top:10px;font-size:13px;color:var(--primary);font-weight:600}
+.pricing-body{padding:14px 16px}
+.pricing-result{background:var(--primary-light);border-radius:10px;padding:14px 16px;margin-top:12px}
+.pr-main{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.pr-label{font-size:12px;color:var(--muted)}
+.pr-price{font-size:28px;font-weight:800;color:var(--primary)}
+.pr-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.pr-grid div{background:#fff;border-radius:8px;padding:10px 6px;box-shadow:var(--shadow)}
+.pr-grid span{display:block;font-size:11px;color:var(--muted);margin-bottom:2px}
+.pr-grid strong{font-size:15px;color:var(--text)}
 </style>
 </head>
 <body>
@@ -281,6 +290,27 @@ tbody tr:last-child td{border-bottom:none}
       <div class="panel">
         <div class="panel-header"><h2>大类库存总览</h2><button class="btn btn-outline btn-sm" onclick="loadCloudData()">🔄 刷新</button></div>
         <div class="table-wrap"><table><thead><tr><th>大类名称</th><th class="text-right">总库存</th><th class="text-right">库存价值</th><th class="text-center">操作</th></tr></thead><tbody id="homeOverviewBody"></tbody></table></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><h2>💰 定价计算器</h2><span style="font-size:12px;color:var(--muted)">进货成本 + 物流费 + 理想毛利 → 建议售价</span></div>
+        <div class="pricing-body">
+          <div class="form-row">
+            <div class="form-group"><label>进货成本（元/件）</label><input type="number" id="pcCost" min="0" step="0.01" placeholder="0.00" oninput="calcPricing()"></div>
+            <div class="form-group"><label>物流费（元/件）</label><input type="number" id="pcShip" min="0" step="0.01" placeholder="0.00" oninput="calcPricing()"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>其他费用（元/件，可选）</label><input type="number" id="pcExtra" min="0" step="0.01" placeholder="0.00" oninput="calcPricing()"></div>
+            <div class="form-group"><label>理想毛利率（%）</label><input type="number" id="pcMargin" min="0" max="99" step="1" value="30" oninput="calcPricing()"></div>
+          </div>
+          <div class="pricing-result">
+            <div class="pr-main"><span class="pr-label">建议售价</span><span class="pr-price" id="pcPrice">¥0.00</span></div>
+            <div class="pr-grid">
+              <div><span>单件总成本</span><strong id="pcTotal">¥0.00</strong></div>
+              <div><span>单件毛利</span><strong id="pcProfit">¥0.00</strong></div>
+              <div><span>实际毛利率</span><strong id="pcMarginOut">30%</strong></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1108,6 +1138,18 @@ function renderHomePendingApprovals(){
     return `<div class="pending-approvals-item"><div><span class="type">${typeText}</span> · ${escapeHtml(p?p.sku:'—')}</div><div class="meta">${escapeHtml(req.by||'—')} · ${timeText}</div></div>`;
   }).join('')+(list.length>5?`<div class="pending-approvals-item" style="justify-content:center;color:var(--muted);font-size:12px">还有 ${list.length-5} 条待审批...</div>`:'');
 }
+function calcPricing(){
+  const cost=parseFloat(document.getElementById('pcCost').value)||0;
+  const ship=parseFloat(document.getElementById('pcShip').value)||0;
+  const extra=parseFloat(document.getElementById('pcExtra').value)||0;
+  const margin=parseFloat(document.getElementById('pcMargin').value)||0;
+  const total=cost+ship+extra;
+  const price=margin>=100?0:total/(1-margin/100);
+  document.getElementById('pcPrice').textContent=fmtMoney(price);
+  document.getElementById('pcTotal').textContent=fmtMoney(total);
+  document.getElementById('pcProfit').textContent=fmtMoney(price-total);
+  document.getElementById('pcMarginOut').textContent=(margin>0?margin:0)+'%';
+}
 function txActionCell(t,pendingSet){
   if(isAdmin()){return `<button class="btn btn-outline btn-sm" onclick="deleteTransaction('${t.id}')">🗑️</button> <button class="btn btn-outline btn-sm" onclick="openEditReqModal('${t.id}',true)">✏️</button>`;}
   if(pendingSet.has(t.id))return `<span style="color:var(--warning);font-size:11px;font-weight:600">🟡 待审批</span>`;
@@ -1476,7 +1518,7 @@ function initApp(){
   const btnClear=document.getElementById('btnClearAll');
   if(btnClear)btnClear.style.display=isAdmin()?'':'none';
   const navApprove=document.getElementById('navApprove');if(navApprove)navApprove.style.display=isAdmin()?'':'none';
-  renderStatsBar();renderCatNav();renderHome();
+  renderStatsBar();renderCatNav();renderHome();calcPricing();
   loadCloudData();
   setInterval(()=>{loadCloudData();},30000);
 }
