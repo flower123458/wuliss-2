@@ -288,7 +288,7 @@ tbody tr:last-child td{border-bottom:none}
     <div id="page-all" class="page" style="display:none">
       <div class="panel">
         <div class="panel-header"><h2>全部SKU库存</h2><button class="btn btn-outline btn-sm" onclick="loadCloudData()">🔄 刷新</button></div>
-        <div class="table-wrap"><table><thead><tr><th>大类</th><th>SKU</th><th class="text-right">采购单价</th><th class="text-right">库存量</th><th class="text-right">库存价值</th><th class="text-center">状态</th><th>分类</th></tr></thead><tbody id="allBody"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>大类</th><th>SKU</th><th class="text-right">采购单价</th><th class="text-right">库存量</th><th class="text-right">库存价值</th><th class="text-center">状态</th><th>分类</th><th class="text-center">操作</th></tr></thead><tbody id="allBody"></tbody></table></div>
       </div>
     </div>
 
@@ -747,7 +747,7 @@ function renderHome(){
 function renderAll(){
   const cats=getCategories();
   const body=document.getElementById('allBody');
-  if(state.products.length===0){body.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="icon">📦</div>暂无商品</div></td></tr>`;return;}
+  if(state.products.length===0){body.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="icon">📦</div>暂无商品</div></td></tr>`;return;}
   let html='';
   cats.forEach(cat=>{
     const items=getProductsByCategory(cat);
@@ -762,10 +762,23 @@ function renderAll(){
         <td class="text-right text-muted">${fmtMoney(stock*(p.purchasePrice||0))}</td>
         <td class="text-center">${tag}</td>
         ${i===0?`<td rowspan="${items.length}" style="vertical-align:middle;background:#FAF5F1">${escapeHtml(p.location)||'—'}</td>`:''}
+        <td class="text-center">${isAdmin()?`<button class="btn btn-danger btn-sm" onclick="deleteSku('${p.id}')">🗑️ 删除</button>`:'<span class="text-muted">—</span>'}</td>
       </tr>`;
     });
   });
   body.innerHTML=html;
+}
+async function deleteSku(id){
+  if(!isAdmin()){toast('仅管理员(11)可删除商品','error');return;}
+  const p=getProduct(id);if(!p)return;
+  if(!confirm(`确定删除「${p.category} - ${p.sku}」吗？\n该商品及其所有出入库流水（含待审批申请）将被永久删除，不可恢复。`))return;
+  try{
+    const related=state.transactions.filter(t=>t.productId===id).map(t=>Cloud.deleteTransaction(t.id));
+    await Promise.all(related);
+    await Cloud.deleteProduct(id);
+    await loadCloudData();
+    toast(`已删除「${p.sku}」`,'success');
+  }catch(e){console.error(e);toast('删除失败','error');}
 }
 
 function renderCategoryDetail(cat){
