@@ -188,6 +188,16 @@ tbody tr:last-child td{border-bottom:none}
   .quick-btn{min-width:140px}
   .sku-grid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}
 }
+.pending-approvals{background:linear-gradient(135deg,#F9F0E6,#fff);border:1px solid var(--warning);border-radius:var(--radius);padding:14px 16px;margin-bottom:18px;box-shadow:var(--shadow);cursor:pointer;transition:transform .15s,box-shadow .15s}
+.pending-approvals:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.1)}
+.pending-approvals-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.pending-approvals-title{font-size:15px;font-weight:700;color:var(--warning);display:flex;align-items:center;gap:6px}
+.pending-approvals-count{background:var(--warning);color:#fff;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:700}
+.pending-approvals-list{display:flex;flex-direction:column;gap:8px}
+.pending-approvals-item{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:8px 10px;background:#fff;border-radius:8px;border:1px solid var(--border)}
+.pending-approvals-item .type{font-weight:600;color:var(--text)}
+.pending-approvals-item .meta{color:var(--muted);font-size:11px;white-space:nowrap}
+.pending-approvals-footer{text-align:right;margin-top:10px;font-size:13px;color:var(--primary);font-weight:600}
 </style>
 </head>
 <body>
@@ -263,6 +273,11 @@ tbody tr:last-child td{border-bottom:none}
         <button class="quick-btn out" onclick="openOutboundModal()"><div class="qa-icon">📤</div><div class="qa-title">出库登记</div><div class="qa-sub">记录销售/领用出库</div></button>
       </div>
       <div class="stats" id="statsBar"></div>
+      <div class="pending-approvals" id="homePendingApprovals" style="display:none" onclick="navTo('approve')">
+        <div class="pending-approvals-header"><div class="pending-approvals-title">✅ 审批代办</div><span class="pending-approvals-count" id="homePendingCount">0</span></div>
+        <div class="pending-approvals-list" id="homePendingList"></div>
+        <div class="pending-approvals-footer">去审批中心处理 →</div>
+      </div>
       <div class="panel">
         <div class="panel-header"><h2>大类库存总览</h2><button class="btn btn-outline btn-sm" onclick="loadCloudData()">🔄 刷新</button></div>
         <div class="table-wrap"><table><thead><tr><th>大类名称</th><th class="text-right">总库存</th><th class="text-right">库存价值</th><th class="text-center">操作</th></tr></thead><tbody id="homeOverviewBody"></tbody></table></div>
@@ -712,6 +727,7 @@ function renderStatsBar(){
 
 function renderHome(){
   renderStatsBar();
+  renderHomePendingApprovals();
   const cats=getCategories();
   const body=document.getElementById('homeOverviewBody');
   if(cats.length===0){body.innerHTML=`<tr><td colspan="4"><div class="empty"><div class="icon">📦</div>暂无大类，点击左侧「新增大类」开始</div></td></tr>`;return;}
@@ -1062,6 +1078,23 @@ function isReqRow(t){return t.type==='req_del'||t.type==='req_edit';}
 function parseReq(t){try{return JSON.parse(t.notes||'{}').req;}catch(e){return null;}}
 function getPendingRequests(){return state.transactions.filter(t=>isReqRow(t)).map(t=>({row:t,req:parseReq(t)})).filter(x=>x.req&&x.req.status==='pending');}
 function updateApproveBadge(){const n=getPendingRequests().length;const nav=document.getElementById('navApprove');const badge=document.getElementById('nav-approve');if(isAdmin()){nav.style.display='';badge.textContent=n;}else{nav.style.display='none';}}
+function renderHomePendingApprovals(){
+  const wrap=document.getElementById('homePendingApprovals');
+  const listEl=document.getElementById('homePendingList');
+  const countEl=document.getElementById('homePendingCount');
+  if(!wrap||!listEl||!countEl)return;
+  if(!isAdmin()){wrap.style.display='none';return;}
+  const list=getPendingRequests();
+  if(list.length===0){wrap.style.display='none';return;}
+  wrap.style.display='';
+  countEl.textContent=list.length;
+  listEl.innerHTML=list.slice(0,5).map(({row,req})=>{
+    const p=getProduct(row.productId);
+    const typeText=req.action==='delete'?'🗑️ 申请删除':'✏️ 申请修改';
+    const timeText=req.at?ymd(new Date(req.at)):'—';
+    return `<div class="pending-approvals-item"><div><span class="type">${typeText}</span> · ${escapeHtml(p?p.sku:'—')}</div><div class="meta">${escapeHtml(req.by||'—')} · ${timeText}</div></div>`;
+  }).join('')+(list.length>5?`<div class="pending-approvals-item" style="justify-content:center;color:var(--muted);font-size:12px">还有 ${list.length-5} 条待审批...</div>`:'');
+}
 function txActionCell(t,pendingSet){
   if(isAdmin()){return `<button class="btn btn-outline btn-sm" onclick="deleteTransaction('${t.id}')">🗑️</button> <button class="btn btn-outline btn-sm" onclick="openEditReqModal('${t.id}',true)">✏️</button>`;}
   if(pendingSet.has(t.id))return `<span style="color:var(--warning);font-size:11px;font-weight:600">🟡 待审批</span>`;
@@ -1379,7 +1412,7 @@ function refresh(){
   const cactive=document.querySelector('.cat-item.active');
   if(cactive&&document.getElementById('page-category-detail').style.display!=='none'){renderCategoryDetail(currentCategory);return;}
   const page=active?active.dataset.nav:'home';
-  if(page==='home')renderHome();if(page==='all')renderAll();if(page==='inbound')renderInbound();if(page==='outbound')renderOutbound();if(page==='profit')renderProfit();if(page==='profit-detail')renderProfitDetail(currentCategory);if(page==='approve')renderApprove();
+  if(page==='home'){renderHome();renderHomePendingApprovals();}if(page==='all')renderAll();if(page==='inbound')renderInbound();if(page==='outbound')renderOutbound();if(page==='profit')renderProfit();if(page==='profit-detail')renderProfitDetail(currentCategory);if(page==='approve')renderApprove();
 }
 // ===== 登录系统 =====
 // 每个账号绑定一个固定操作人，登录后录入/录出自动带上该操作人，避免选错
