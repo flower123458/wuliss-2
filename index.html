@@ -188,6 +188,9 @@ tbody tr:last-child td{border-bottom:none}
   .quick-btn{min-width:140px}
   .sku-grid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}
 }
+@media(max-width:480px){
+  .modal .form-row,.modal .form-row-3{grid-template-columns:1fr}
+}
 .pending-approvals{background:linear-gradient(135deg,#F9F0E6,#fff);border:1px solid var(--warning);border-radius:var(--radius);padding:14px 16px;margin-bottom:18px;box-shadow:var(--shadow);cursor:pointer;transition:transform .15s,box-shadow .15s}
 .pending-approvals:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.1)}
 .pending-approvals-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
@@ -518,12 +521,14 @@ tbody tr:last-child td{border-bottom:none}
         <div class="form-group"><label>大类 <span class="req">*</span></label><select id="inCategory" onchange="onInCategoryChange()"></select></div>
         <div class="form-group"><label>SKU <span class="req">*</span></label><select id="inSku"></select></div>
       </div>
-      <div class="form-row-3">
+      <div class="form-row">
         <div class="form-group"><label>入库数量 <span class="req">*</span></label><input type="number" id="inQty" min="1" placeholder="数量"></div>
         <div class="form-group"><label>采购单价（元）</label><input type="number" id="inPrice" step="0.01" min="0" placeholder="留空用默认价"></div>
-        <div class="form-group"><label>入库日期时间</label><input type="datetime-local" id="inDate"></div>
       </div>
-      <div class="form-group"><label>入库人</label><div id="inOperatorDisplay" style="padding:9px 12px;background:#F7EFEA;border-radius:8px;font-weight:600;color:var(--primary)">—</div><input type="hidden" id="inOperator"></div>
+      <div class="form-row">
+        <div class="form-group"><label>入库日期时间</label><input type="datetime-local" id="inDate"></div>
+        <div class="form-group"><label>入库人</label><div id="inOperatorDisplay" style="padding:9px 12px;background:#F7EFEA;border-radius:8px;font-weight:600;color:var(--primary)">—</div><input type="hidden" id="inOperator"></div>
+      </div>
       <div class="form-group"><label>备注</label><textarea id="inNotes" placeholder="采购批次、备注等"></textarea></div>
     </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('inboundModal')">取消</button><button class="btn btn-success" onclick="saveInbound()">确认入库</button></div>
