@@ -207,6 +207,12 @@ tbody tr:last-child td{border-bottom:none}
 .pr-grid div{background:#fff;border-radius:8px;padding:10px 6px;box-shadow:var(--shadow)}
 .pr-grid span{display:block;font-size:11px;color:var(--muted);margin-bottom:2px}
 .pr-grid strong{font-size:15px;color:var(--text)}
+.month-ctrl{display:flex;align-items:center;gap:4px}
+.month-ctrl select{padding:5px 8px;border:1px solid rgba(255,255,255,.7);border-radius:8px;background:rgba(255,255,255,.85);color:#481F19;font-size:13px;outline:none}
+.month-ctrl button{width:30px;height:30px;border-radius:8px;border:none;background:rgba(255,255,255,.4);color:#481F19;font-size:16px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center}
+.month-ctrl button:hover{background:rgba(255,255,255,.65)}
+.mini-bar{height:8px;background:var(--primary-light);border-radius:4px;overflow:hidden}
+.mini-bar>div{height:100%;background:var(--primary);border-radius:4px;min-width:1px}
 </style>
 </head>
 <body>
@@ -266,6 +272,7 @@ tbody tr:last-child td{border-bottom:none}
     <div class="nav-item" data-nav="outbound" onclick="navTo('outbound')"><span class="icon">📤</span><span>出库记录</span><span class="badge" id="nav-outbound">0</span></div>
     <div class="nav-item" data-nav="approve" onclick="navTo('approve')" id="navApprove" style="display:none"><span class="icon">✅</span><span>审批中心</span><span class="badge" id="nav-approve">0</span></div>
     <div class="nav-item" data-nav="profit" onclick="navTo('profit')"><span class="icon">💰</span><span>收益分析</span></div>
+    <div class="nav-item" data-nav="monthly" onclick="navTo('monthly')"><span class="icon">🗓️</span><span>月度经营分析</span></div>
     <div class="nav-section-title collapsible" onclick="toggleCatNav()" title="展开 / 收起">商品大类 <span class="toggle-arrow" id="catNavArrow">▾</span></div>
     <div id="catNavList"></div>
     <div class="nav-section-title">快捷操作</div>
@@ -383,6 +390,28 @@ tbody tr:last-child td{border-bottom:none}
         </div>
         <div class="stats" id="profitSummary"></div>
         <div class="table-wrap"><table><thead><tr><th>SKU</th><th class="text-right">卖出数量</th><th class="text-right">销售收入</th><th class="text-right">卖出成本</th><th class="text-right">毛利</th><th class="text-right">毛利率</th></tr></thead><tbody id="profitDetailBody"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- 月度经营分析页 -->
+    <div id="page-monthly" class="page" style="display:none">
+      <div class="category-detail-header" id="monthlyHeader"></div>
+      <div class="stats" id="monthlyKpi"></div>
+      <div class="panel">
+        <div class="panel-header"><h2>📈 每日销售趋势</h2><span style="font-size:12px;color:var(--muted)">当月每日售出件数与收入</span></div>
+        <div class="table-wrap"><table><thead><tr><th>日期</th><th class="text-center">星期</th><th class="text-right">售出件数</th><th class="text-right">销售收入</th><th class="text-right">毛利</th><th style="width:30%">收入对比</th></tr></thead><tbody id="monthlyDailyBody"></tbody></table></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><h2>💰 各大类毛利榜</h2><span style="font-size:12px;color:var(--muted)">仅统计已卖出（出库）的货品</span></div>
+        <div class="table-wrap"><table><thead><tr><th>大类</th><th class="text-right">销售收入</th><th class="text-right">毛利</th><th class="text-right">毛利率</th><th style="width:30%">毛利占比</th></tr></thead><tbody id="monthlyCatBody"></tbody></table></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><h2>🏆 SKU 销量排行</h2><span style="font-size:12px;color:var(--muted)">按销售收入排序</span></div>
+        <div class="table-wrap"><table><thead><tr><th>#</th><th>SKU</th><th class="text-right">售出件数</th><th class="text-right">销售收入</th><th class="text-right">毛利</th></tr></thead><tbody id="monthlySkuBody"></tbody></table></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><h2>🛒 销售渠道分布</h2><span style="font-size:12px;color:var(--muted)">当月各渠道收入</span></div>
+        <div class="table-wrap"><table><thead><tr><th>渠道</th><th class="text-right">售出件数</th><th class="text-right">销售收入</th><th class="text-right">毛利</th><th style="width:30%">收入占比</th></tr></thead><tbody id="monthlyChannelBody"></tbody></table></div>
       </div>
     </div>
 
@@ -680,6 +709,7 @@ function navTo(page,cat){
     if(page==='expected')renderExpected();
     if(page==='person-stock'){currentCategory=cat;renderPersonStock(cat);}
     if(page==='profit')renderProfit();
+    if(page==='monthly')renderMonthly();
     if(page==='profit-detail'){currentCategory=cat;renderProfitDetail(cat);}
     if(page==='approve')renderApprove();
   if(window.innerWidth<=768){document.getElementById('sidebar').classList.remove('mobile-show');document.getElementById('overlay').classList.remove('show');}
@@ -1481,6 +1511,93 @@ function resetProfitFilter(){
   else renderProfitDetail(currentCategory);
 }
 
+/* ===== 月度经营分析（按月维度，可切换月份） ===== */
+let monthly={m:''};
+function ymOf(d){return (d||'').replace('T',' ').slice(0,7);}
+function monthsWithData(){const s=new Set();state.transactions.forEach(t=>{if(t.type==='in'||t.type==='out'){const m=ymOf(t.date);if(/^\d{4}-\d{2}$/.test(m))s.add(m);}});const n=new Date();s.add(n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0'));return [...s].sort();}
+function monthLabel(m){if(!m)return '—';const p=m.split('-');return p[0]+'年'+Number(p[1])+'月';}
+function monthSelGo(){const sel=document.getElementById('monthSel');if(sel){monthly.m=sel.value;renderMonthly();}}
+function monthStep(d){const ms=monthsWithData();const i=ms.indexOf(monthly.m);const j=Math.min(ms.length-1,Math.max(0,i+d));if(ms[j]){monthly.m=ms[j];renderMonthly();}}
+function renderMonthly(){
+  const ms=monthsWithData();
+  if(!monthly.m||!ms.includes(monthly.m))monthly.m=ms.length?ms[ms.length-1]:new Date().toISOString().slice(0,7);
+  const m=monthly.m;
+  const first=m===ms[0],last=m===ms[ms.length-1];
+  document.getElementById('monthlyHeader').innerHTML=`<button class="cd-back" onclick="navTo('home')" title="返回">‹</button>
+    <div class="cd-name">🗓️ ${monthLabel(m)} 经营分析</div>
+    <div class="cd-meta">当月销售 / 进货 / 毛利，可切换查看任意月份</div>
+    <div class="month-ctrl" style="position:absolute;top:16px;right:14px">
+      <button onclick="monthStep(-1)" ${first?'disabled style="opacity:.4"':''}>‹</button>
+      <select id="monthSel" onchange="monthSelGo()" style="padding:4px 6px;border-radius:8px;border:1px solid rgba(255,255,255,.6);background:rgba(255,255,255,.9);color:#481F19;font-size:12px;max-width:130px">${[...ms].reverse().map(x=>`<option value="${x}" ${x===m?'selected':''}>${monthLabel(x)}</option>`).join('')}</select>
+      <button onclick="monthStep(1)" ${last?'disabled style="opacity:.4"':''}>›</button>
+    </div>`;
+  const outs=state.transactions.filter(t=>t.type==='out'&&ymOf(t.date)===m);
+  const ins=state.transactions.filter(t=>t.type==='in'&&ymOf(t.date)===m);
+  let rev=0,pf=0,qty=0;
+  const cat={},sku={},day={},chan={};
+  outs.forEach(t=>{const p=getProduct(t.productId);if(!p)return;
+    const r=t.qty*(t.price||0),c=t.qty*(p.purchasePrice||0),g=r-c;
+    rev+=r;pf+=g;qty+=t.qty;
+    const ck=p.category||'未分类',sk=p.sku,dk=(t.date||'').slice(0,10),ch=t.salesChannel||'未填写';
+    (cat[ck]=cat[ck]||{rev:0,pf:0}).rev+=r,(cat[ck].pf+=g);
+    const sv=sku[sk]=sku[sk]||{cat:ck,qty:0,rev:0,pf:0};sv.qty+=t.qty;sv.rev+=r;sv.pf+=g;
+    const dv=day[dk]=day[dk]||{qty:0,rev:0,pf:0};dv.qty+=t.qty;dv.rev+=r;dv.pf+=g;
+    const cv=chan[ch]=chan[ch]||{qty:0,rev:0,pf:0};cv.qty+=t.qty;cv.rev+=r;cv.pf+=g;
+  });
+  const inQty=ins.reduce((s,t)=>s+t.qty,0);
+  const inAmt=ins.reduce((s,t)=>s+t.qty*(t.price||0),0);
+  const margin=rev>0?pf/rev:0;
+  document.getElementById('monthlyKpi').innerHTML=`
+    <div class="stat-card"><div class="stat-icon purple">💰</div><div class="stat-info"><div class="label">当月销售收入</div><div class="value">${fmtMoney(rev)}</div></div></div>
+    <div class="stat-card"><div class="stat-icon green">📈</div><div class="stat-info"><div class="label">当月毛利</div><div class="value" style="color:${pf>=0?'var(--success)':'var(--danger)'}">${fmtMoney(pf)}</div></div></div>
+    <div class="stat-card"><div class="stat-icon blue">%</div><div class="stat-info"><div class="label">当月毛利率</div><div class="value">${outs.length?(margin*100).toFixed(1)+'%':'—'}</div></div></div>
+    <div class="stat-card"><div class="stat-icon orange">📦</div><div class="stat-info"><div class="label">当月售出</div><div class="value">${fmt(qty)}<span style="font-size:11px;color:var(--muted)"> 件</span></div></div></div>
+    <div class="stat-card"><div class="stat-icon red">🧾</div><div class="stat-info"><div class="label">当月销售笔数</div><div class="value">${fmt(outs.length)}<span style="font-size:11px;color:var(--muted)"> 笔</span></div></div></div>
+    <div class="stat-card"><div class="stat-icon teal">🛒</div><div class="stat-info"><div class="label">当月进货支出</div><div class="value">${fmtMoney(inAmt)}</div><div class="sub">入库 ${fmt(inQty)} 件 / ${fmt(ins.length)} 笔</div></div></div>`;
+  // 每日销售趋势
+  const dB=document.getElementById('monthlyDailyBody');
+  const days=Object.keys(day).sort();
+  if(days.length===0){dB.innerHTML=`<tr><td colspan="6"><div class="empty"><div class="icon">📈</div>当月暂无销售记录</div></td></tr>`;}
+  else{
+    const maxRev=Math.max(...days.map(d=>day[d].rev),1);
+    const wd=['周日','周一','周二','周三','周四','周五','周六'];
+    dB.innerHTML=days.map(d=>{const v=day[d];const w=new Date(d+'T00:00:00').getDay();return `<tr><td class="nowrap"><strong>${d.slice(5)}</strong></td><td class="text-center text-muted" style="font-size:12px">${wd[w]}</td><td class="text-right">${fmt(v.qty)}</td><td class="text-right">${fmtMoney(v.rev)}</td><td class="text-right" style="color:${v.pf>=0?'var(--success)':'var(--danger)'}">${fmtMoney(v.pf)}</td><td><div class="mini-bar"><div style="width:${Math.max(1,v.rev/maxRev*100).toFixed(1)}%"></div></div></td></tr>`;}).join('');
+  }
+  // 各大类毛利榜
+  const cB=document.getElementById('monthlyCatBody');
+  const ckeys=Object.keys(cat).sort((a,b)=>cat[b].pf-cat[a].pf);
+  if(ckeys.length===0){cB.innerHTML=`<tr><td colspan="5"><div class="empty"><div class="icon">💰</div>当月暂无销售数据</div></td></tr>`;}
+  else{
+    cB.innerHTML=ckeys.map(k=>{const v=cat[k];const mm=v.rev>0?v.pf/v.rev:0;const pct=pf>0?Math.max(0,v.pf/pf*100):0;return `<tr>
+      <td><strong>${escapeHtml(k)}</strong></td>
+      <td class="text-right">${fmtMoney(v.rev)}</td>
+      <td class="text-right"><strong style="color:${v.pf>=0?'var(--success)':'var(--danger)'}">${fmtMoney(v.pf)}</strong></td>
+      <td class="text-right">${(mm*100).toFixed(1)}%</td>
+      <td><div style="display:flex;align-items:center;gap:8px"><div class="mini-bar" style="flex:1"><div style="width:${pct.toFixed(1)}%"></div></div><span style="font-size:11px;color:var(--muted);min-width:38px;text-align:right">${pct.toFixed(1)}%</span></div></td>
+    </tr>`;}).join('')+`<tr style="font-weight:600;background:var(--primary-light)"><td>合计</td><td class="text-right">${fmtMoney(rev)}</td><td class="text-right" style="color:${pf>=0?'var(--success)':'var(--danger)'}">${fmtMoney(pf)}</td><td class="text-right">${(margin*100).toFixed(1)}%</td><td></td></tr>`;
+  }
+  // SKU 销量排行
+  const kB=document.getElementById('monthlySkuBody');
+  const skuKeys=Object.keys(sku).sort((a,b)=>sku[b].rev-sku[a].rev);
+  if(skuKeys.length===0){kB.innerHTML=`<tr><td colspan="5"><div class="empty"><div class="icon">🏆</div>当月暂无销售数据</div></td></tr>`;}
+  else{
+    kB.innerHTML=skuKeys.slice(0,20).map((k,i)=>{const v=sku[k];return `<tr><td class="text-muted">${i+1}</td><td><strong>${escapeHtml(v.cat)}</strong> · ${escapeHtml(k)}</td><td class="text-right">${fmt(v.qty)}</td><td class="text-right">${fmtMoney(v.rev)}</td><td class="text-right" style="color:${v.pf>=0?'var(--success)':'var(--danger)'}">${fmtMoney(v.pf)}</td></tr>`;}).join('')+(skuKeys.length>20?`<tr><td colspan="5" class="text-muted" style="text-align:center;font-size:12px">… 共 ${skuKeys.length} 个 SKU，仅显示前 20</td></tr>`:'');
+  }
+  // 销售渠道分布
+  const chB=document.getElementById('monthlyChannelBody');
+  const chKeys=Object.keys(chan).sort((a,b)=>chan[b].rev-chan[a].rev);
+  if(chKeys.length===0){chB.innerHTML=`<tr><td colspan="5"><div class="empty"><div class="icon">🛒</div>当月暂无销售数据</div></td></tr>`;}
+  else{
+    chB.innerHTML=chKeys.map(k=>{const v=chan[k];const pct=rev>0?v.rev/rev*100:0;return `<tr>
+      <td><strong>${escapeHtml(k)}</strong></td>
+      <td class="text-right">${fmt(v.qty)}</td>
+      <td class="text-right">${fmtMoney(v.rev)}</td>
+      <td class="text-right" style="color:${v.pf>=0?'var(--success)':'var(--danger)'}">${fmtMoney(v.pf)}</td>
+      <td><div style="display:flex;align-items:center;gap:8px"><div class="mini-bar" style="flex:1"><div style="width:${pct.toFixed(1)}%;background:var(--secondary)"></div></div><span style="font-size:11px;color:var(--muted);min-width:38px;text-align:right">${pct.toFixed(1)}%</span></div></td>
+    </tr>`;}).join('');
+  }
+}
+
 function closeModal(id){document.getElementById(id).classList.remove('show')}
 document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('show')});});
 
@@ -1490,7 +1607,7 @@ function refresh(){
   const cactive=document.querySelector('.cat-item.active');
   if(cactive&&document.getElementById('page-category-detail').style.display!=='none'){renderCategoryDetail(currentCategory);return;}
   const page=active?active.dataset.nav:'home';
-  if(page==='home'){renderHome();renderHomePendingApprovals();}if(page==='all')renderAll();if(page==='inbound')renderInbound();if(page==='outbound')renderOutbound();if(page==='profit')renderProfit();if(page==='profit-detail')renderProfitDetail(currentCategory);if(page==='approve')renderApprove();
+  if(page==='home'){renderHome();renderHomePendingApprovals();}if(page==='all')renderAll();if(page==='inbound')renderInbound();if(page==='outbound')renderOutbound();if(page==='profit')renderProfit();if(page==='monthly')renderMonthly();if(page==='profit-detail')renderProfitDetail(currentCategory);if(page==='approve')renderApprove();
 }
 // ===== 登录系统 =====
 // 每个账号绑定一个固定操作人，登录后录入/录出自动带上该操作人，避免选错
