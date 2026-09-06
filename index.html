@@ -688,7 +688,7 @@ const fmtDateCell=s=>{if(!s)return '—';if(s.length===10)return `<div>${s}</div
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 function toast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show '+type;setTimeout(()=>t.className='toast '+type,2500)}
 function escapeHtml(s){return(s||'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function calcStock(pid){return state.transactions.filter(t=>t.productId===pid).reduce((s,t)=>s+(t.type==='in'?t.qty:-t.qty),0)}
+function calcStock(pid){return state.transactions.filter(t=>t.productId===pid&&(t.type==='in'||t.type==='out')).reduce((s,t)=>s+(t.type==='in'?t.qty:-t.qty),0)}
 function getProduct(id){return state.products.find(p=>p.id===id)}
 function getStatus(p){const s=calcStock(p.id);return s<=0?'out':s<=(p.safetyStock||0)?'low':'normal'}
 
@@ -1540,7 +1540,8 @@ function renderMonthly(){
     rev+=r;pf+=g;qty+=t.qty;
     const ck=p.category||'未分类',sk=p.sku,dk=(t.date||'').slice(0,10),ch=t.salesChannel||'未填写';
     (cat[ck]=cat[ck]||{rev:0,pf:0}).rev+=r,(cat[ck].pf+=g);
-    const sv=sku[sk]=sku[sk]||{cat:ck,qty:0,rev:0,pf:0};sv.qty+=t.qty;sv.rev+=r;sv.pf+=g;
+    const skey=ck+'|'+sk;
+    const sv=sku[skey]=sku[skey]||{cat:ck,sku:sk,qty:0,rev:0,pf:0};sv.qty+=t.qty;sv.rev+=r;sv.pf+=g;
     const dv=day[dk]=day[dk]||{qty:0,rev:0,pf:0};dv.qty+=t.qty;dv.rev+=r;dv.pf+=g;
     const cv=chan[ch]=chan[ch]||{qty:0,rev:0,pf:0};cv.qty+=t.qty;cv.rev+=r;cv.pf+=g;
   });
@@ -1581,7 +1582,7 @@ function renderMonthly(){
   const skuKeys=Object.keys(sku).sort((a,b)=>sku[b].rev-sku[a].rev);
   if(skuKeys.length===0){kB.innerHTML=`<tr><td colspan="5"><div class="empty"><div class="icon">🏆</div>当月暂无销售数据</div></td></tr>`;}
   else{
-    kB.innerHTML=skuKeys.slice(0,20).map((k,i)=>{const v=sku[k];return `<tr><td class="text-muted">${i+1}</td><td><strong>${escapeHtml(v.cat)}</strong> · ${escapeHtml(k)}</td><td class="text-right">${fmt(v.qty)}</td><td class="text-right">${fmtMoney(v.rev)}</td><td class="text-right" style="color:${v.pf>=0?'var(--success)':'var(--danger)'}">${fmtMoney(v.pf)}</td></tr>`;}).join('')+(skuKeys.length>20?`<tr><td colspan="5" class="text-muted" style="text-align:center;font-size:12px">… 共 ${skuKeys.length} 个 SKU，仅显示前 20</td></tr>`:'');
+    kB.innerHTML=skuKeys.slice(0,20).map((k,i)=>{const v=sku[k];return `<tr><td class="text-muted">${i+1}</td><td><strong>${escapeHtml(v.cat)}</strong> · ${escapeHtml(v.sku)}</td><td class="text-right">${fmt(v.qty)}</td><td class="text-right">${fmtMoney(v.rev)}</td><td class="text-right" style="color:${v.pf>=0?'var(--success)':'var(--danger)'}">${fmtMoney(v.pf)}</td></tr>`;}).join('')+(skuKeys.length>20?`<tr><td colspan="5" class="text-muted" style="text-align:center;font-size:12px">… 共 ${skuKeys.length} 个 SKU，仅显示前 20</td></tr>`:'');
   }
   // 销售渠道分布
   const chB=document.getElementById('monthlyChannelBody');
