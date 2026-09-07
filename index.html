@@ -212,6 +212,11 @@ tbody tr:last-child td{border-bottom:none}
 .month-ctrl button{width:30px;height:30px;border-radius:8px;border:none;background:rgba(255,255,255,.4);color:#481F19;font-size:16px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center}
 .month-ctrl button:hover{background:rgba(255,255,255,.65)}
 .mini-bar{height:8px;background:var(--primary-light);border-radius:4px;overflow:hidden}
+.mc-host{margin-top:12px}
+.mc-legend{display:flex;gap:14px;align-items:center;font-size:11px;color:var(--muted);margin-top:4px;flex-wrap:wrap}
+.mc-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.mc-legend em{margin-left:auto;font-style:normal;color:#c99;max-width:70%;text-align:right;line-height:1.5}
+.chart-empty{text-align:center;color:var(--muted);font-size:12px;padding:24px 0}
 .mini-bar>div{height:100%;background:var(--primary);border-radius:4px;min-width:1px}
 </style>
 </head>
@@ -400,6 +405,7 @@ tbody tr:last-child td{border-bottom:none}
       <div class="panel">
         <div class="panel-header"><h2>📈 每日销售趋势</h2><span style="font-size:12px;color:var(--muted)">当月每日售出件数与收入</span></div>
         <div class="table-wrap"><table><thead><tr><th>日期</th><th class="text-center">星期</th><th class="text-right">售出件数</th><th class="text-right">销售收入</th><th class="text-right">毛利</th><th style="width:30%">收入对比</th></tr></thead><tbody id="monthlyDailyBody"></tbody></table></div>
+        <div style="padding:0 14px 14px"><div id="monthlyChart" class="mc-host"></div></div>
       </div>
       <div class="panel">
         <div class="panel-header"><h2>💰 各大类毛利榜</h2><span style="font-size:12px;color:var(--muted)">仅统计已卖出（出库）的货品</span></div>
@@ -1549,6 +1555,52 @@ function resetProfitFilter(){
 
 /* ===== 月度经营分析（按月维度，可切换月份） ===== */
 let monthly={m:''};
+let mcLastDay=null;
+/* 每日趋势折线图（自绘SVG，无外部依赖） */
+function renderMonthlyChart(day){
+  const host=document.getElementById('monthlyChart');if(!host)return;
+  if(day)mcLastDay=day;
+  const d=mcLastDay||{};
+  const days=Object.keys(d).sort();
+  if(days.length===0){host.innerHTML='<div class="chart-empty">当月暂无销售数据，无法绘制趋势图</div>';return;}
+  const W=Math.max(host.clientWidth||0,320),H=250,pl=48,pr=14,pt=14,pb=30;
+  const iw=W-pl-pr,ih=H-pt-pb;
+  const maxV=Math.max(...days.map(k=>d[k].rev),1);
+  const rawStep=Math.pow(10,Math.floor(Math.log10(maxV)))/2;
+  const yMax=Math.ceil(maxV/rawStep)*rawStep;
+  const minPf=Math.min(...days.map(k=>d[k].pf),0);
+  const yMin=minPf<0?Math.floor(minPf/rawStep)*rawStep:0;
+  const X=i=>days.length===1?pl+iw/2:pl+iw*i/(days.length-1);
+  const Y=v=>yMax===yMin?pt+ih/2:pt+ih*(1-(v-yMin)/(yMax-yMin));
+  const km=v=>v>=10000?(v/10000).toFixed(1).replace(/\.0$/,'')+'w':v>=1000?(v/1000).toFixed(1).replace(/\.0$/,'')+'k':Math.round(v);
+  const path=k=>days.map((x,i)=>`${i?'L':'M'}${X(i).toFixed(1)},${Y(d[x][k]).toFixed(1)}`).join('');
+  const gl=Math.max(2,Math.min(5,Math.round(ih/55)));
+  let grid='';
+  for(let g=0;g<=gl;g++){const v=yMin+(yMax-yMin)*g/gl,y=Y(v);
+    grid+=`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${W-pr}" y2="${y.toFixed(1)}" stroke="rgba(107,60,60,.1)" stroke-width="1"/><text x="${pl-7}" y="${(y+3).toFixed(1)}" text-anchor="end" font-size="10" fill="#b78d8d">¥${km(v)}</text>`;}
+  const lx=Math.max(1,Math.ceil(days.length/10));
+  let xl='';
+  days.forEach((k,i)=>{if(i%lx===0||i===days.length-1)xl+=`<text x="${X(i).toFixed(1)}" y="${H-9}" text-anchor="middle" font-size="10" fill="#b78d8d">${k.slice(8)}日</text>`;});
+  const dots=k=>days.map((x,i)=>`<circle cx="${X(i).toFixed(1)}" cy="${Y(d[x][k]).toFixed(1)}" r="6" fill="transparent" stroke="none" data-i="${i}"/><circle cx="${X(i).toFixed(1)}" cy="${Y(d[x][k]).toFixed(1)}" r="3" fill="#fff" stroke="${k==='rev'?'#e08585':'#4db6a4'}" stroke-width="2" pointer-events="none"/>`).join('');
+  host.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" preserveAspectRatio="xMidYMid meet" style="display:block">
+    <defs><linearGradient id="mcGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e08585" stop-opacity=".28"/><stop offset="1" stop-color="#e08585" stop-opacity="0"/></linearGradient></defs>
+    ${grid}${xl}
+    <path d="${path('rev')} L${X(days.length-1).toFixed(1)},${Y(yMin).toFixed(1)} L${X(0).toFixed(1)},${Y(yMin).toFixed(1)} Z" fill="url(#mcGrad)" stroke="none"/>
+    <path d="${path('rev')}" fill="none" stroke="#e08585" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="${path('pf')}" fill="none" stroke="#4db6a4" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    ${dots('rev')}${dots('pf')}
+  </svg>
+  <div class="mc-legend"><span><i style="background:#e08585"></i>销售收入</span><span><i style="background:#4db6a4"></i>毛利</span><em id="mcTip">点圆点看当日明细</em></div>`;
+}
+if(!window.__mcBound){
+  window.__mcBound=true;
+  const mcShow=i=>{const days=mcLastDay?Object.keys(mcLastDay).sort():[];if(!days[i])return;const v=mcLastDay[days[i]];
+    const tip=document.getElementById('mcTip');if(tip)tip.innerHTML=`<b>${days[i].slice(5)}</b>：售出 ${v.qty} 件 · 收入 ${fmtMoney(v.rev)} · 毛利 <span style="color:${v.pf>=0?'#4db6a4':'#c88787'}">${fmtMoney(v.pf)}</span>`;};
+  document.addEventListener('click',e=>{const c=e.target.closest&&e.target.closest('#monthlyChart circle[data-i]');if(c)mcShow(+c.dataset.i);});
+  document.addEventListener('mouseover',e=>{const c=e.target.closest&&e.target.closest('#monthlyChart circle[data-i]');if(c)mcShow(+c.dataset.i);});
+  let mcRt=null;
+  window.addEventListener('resize',()=>{clearTimeout(mcRt);mcRt=setTimeout(()=>{const pg=document.getElementById('page-monthly');if(pg&&pg.style.display!=='none')renderMonthlyChart();},200);});
+}
 function ymOf(d){return (d||'').replace('T',' ').slice(0,7);}
 function monthsWithData(){const s=new Set();state.transactions.forEach(t=>{if(t.type==='in'||t.type==='out'){const m=ymOf(t.date);if(/^\d{4}-\d{2}$/.test(m))s.add(m);}});const n=new Date();s.add(n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0'));return [...s].sort();}
 function monthLabel(m){if(!m)return '—';const p=m.split('-');return p[0]+'年'+Number(p[1])+'月';}
@@ -1601,6 +1653,7 @@ function renderMonthly(){
     const wd=['周日','周一','周二','周三','周四','周五','周六'];
     dB.innerHTML=days.map(d=>{const v=day[d];const w=new Date(d+'T00:00:00').getDay();return `<tr><td class="nowrap"><strong>${d.slice(5)}</strong></td><td class="text-center text-muted" style="font-size:12px">${wd[w]}</td><td class="text-right">${fmt(v.qty)}</td><td class="text-right">${fmtMoney(v.rev)}</td><td class="text-right" style="color:${v.pf>=0?'var(--success)':'var(--danger)'}">${fmtMoney(v.pf)}</td><td><div class="mini-bar"><div style="width:${Math.max(1,v.rev/maxRev*100).toFixed(1)}%"></div></div></td></tr>`;}).join('');
   }
+  renderMonthlyChart(day);
   // 各大类毛利榜
   const cB=document.getElementById('monthlyCatBody');
   const ckeys=Object.keys(cat).sort((a,b)=>cat[b].pf-cat[a].pf);
