@@ -1378,8 +1378,31 @@ function goToTxPage(p){txPagination.page=p;renderCategoryDetail(currentCategory)
 
 /* ===== 收益分析（仅统计已卖出=出库的货品） ===== */
 let profitFilter={start:'',end:'',channel:''};
+// 移动加权平均：逐商品按时序演进，返回 每笔出库交易id -> 该笔出库时的单件成本
+function buildAvgCostMap(){
+  const byProd={};
+  state.transactions.forEach(t=>{if(t.type==='in'||t.type==='out'){(byProd[t.productId]=byProd[t.productId]||[]).push(t);}});
+  const map={};
+  Object.values(byProd).forEach(list=>{
+    list.sort((a,b)=>(a.date||'').localeCompare(b.date||'')||((a.createdAt||0)-(b.createdAt||0)));
+    const prod=getProduct(list[0].productId);
+    const fb=prod?(prod.purchasePrice||0):0;
+    let qty=0,cost=0;
+    list.forEach(t=>{
+      if(t.type==='in'){qty+=t.qty;cost+=t.qty*(t.price||0);}
+      else{
+        const uc=qty>0?cost/qty:fb;
+        map[t.id]=uc;
+        if(qty>=t.qty){cost-=t.qty*uc;qty-=t.qty;}else{qty=0;cost=0;}
+      }
+    });
+  });
+  return map;
+}
+function avgCostOf(t,map,fb){const u=map[t.id];return u!==undefined?u:fb;}
 function computeProfit(cat){
   const items=getProductsByCategory(cat);
+  const cm=buildAvgCostMap();
   return items.map(p=>{
     let txs=state.transactions.filter(t=>t.type==='out'&&t.productId===p.id);
     if(profitFilter.start)txs=txs.filter(t=>t.date>=profitFilter.start);
@@ -1387,7 +1410,7 @@ function computeProfit(cat){
     if(profitFilter.channel)txs=txs.filter(t=>t.salesChannel===profitFilter.channel);
     const soldQty=txs.reduce((a,t)=>a+t.qty,0);
     const revenue=txs.reduce((a,t)=>a+t.qty*(t.price||0),0);
-    const cost=soldQty*(p.purchasePrice||0);
+    const cost=txs.reduce((a,t)=>a+t.qty*avgCostOf(t,cm,p.purchasePrice||0),0);
     const profit=revenue-cost;
     return {sku:p.sku,soldQty,revenue,cost,profit,margin:revenue>0?profit/revenue:0};
   }).filter(d=>d.soldQty>0).sort((a,b)=>b.profit-a.profit);
@@ -1533,10 +1556,11 @@ function renderMonthly(){
     </div>`;
   const outs=state.transactions.filter(t=>t.type==='out'&&ymOf(t.date)===m);
   const ins=state.transactions.filter(t=>t.type==='in'&&ymOf(t.date)===m);
+  const cm=buildAvgCostMap();
   let rev=0,pf=0,qty=0;
   const cat={},sku={},day={},chan={};
   outs.forEach(t=>{const p=getProduct(t.productId);if(!p)return;
-    const r=t.qty*(t.price||0),c=t.qty*(p.purchasePrice||0),g=r-c;
+    const r=t.qty*(t.price||0),c=t.qty*avgCostOf(t,cm,p.purchasePrice||0),g=r-c;
     rev+=r;pf+=g;qty+=t.qty;
     const ck=p.category||'未分类',sk=p.sku,dk=(t.date||'').slice(0,10),ch=t.salesChannel||'未填写';
     (cat[ck]=cat[ck]||{rev:0,pf:0}).rev+=r,(cat[ck].pf+=g);
