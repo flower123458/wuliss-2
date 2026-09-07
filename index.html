@@ -686,7 +686,8 @@ let inPage=1,outPage=1,lastInFilter='',lastOutFilter='';
 
 const fmt=n=>(n||0).toLocaleString('zh-CN',{minimumFractionDigits:0,maximumFractionDigits:2});
 const fmtMoney=n=>'¥'+fmt(n||0);
-const today=()=>new Date().toISOString().slice(0,10);
+const today=()=>{const d=new Date();const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;};
+const localStamp=ts=>{const d=new Date(ts);const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;};
 const nowTime=()=>{const d=new Date();const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;};
 const toDatetimeLocal=()=>{const d=new Date();const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;};
 const fmtDate=s=>{if(!s)return '—';if(s.length===10)return s;return s.replace('T',' ').slice(0,19);};
@@ -1284,7 +1285,7 @@ function renderApprove(){
     let detail;
     if(req.action==='delete'){detail=`申请 <b style="color:var(--danger)">删除</b> 该${tt}记录（${fmt(req.original.qty)} 件）`;}
     else{const o=req.original,n=req.proposed;detail=`申请 <b style="color:var(--primary)">修改</b> 该${tt}记录：数量 ${fmt(o.qty)}→${fmt(n.qty)}，单价 ${fmtMoney(o.price)}→${fmtMoney(n.price)}`+(o.date!==n.date?'，日期已调整':'');}
-    const at=req.at?fmtDateCell(new Date(req.at).toISOString().slice(0,19).replace('T',' ')):'—';
+    const at=req.at?fmtDateCell(localStamp(req.at)):'—';
     return `<tr>
       <td><strong>${cat}</strong><br><span class="text-muted">${sku}</span></td>
       <td>${tt}</td>
@@ -1608,7 +1609,7 @@ function monthSelGo(){const sel=document.getElementById('monthSel');if(sel){mont
 function monthStep(d){const ms=monthsWithData();const i=ms.indexOf(monthly.m);const j=Math.min(ms.length-1,Math.max(0,i+d));if(ms[j]){monthly.m=ms[j];renderMonthly();}}
 function renderMonthly(){
   const ms=monthsWithData();
-  if(!monthly.m||!ms.includes(monthly.m))monthly.m=ms.length?ms[ms.length-1]:new Date().toISOString().slice(0,7);
+  if(!monthly.m||!ms.includes(monthly.m))monthly.m=ms.length?ms[ms.length-1]:today().slice(0,7);
   const m=monthly.m;
   const first=m===ms[0],last=m===ms[ms.length-1];
   document.getElementById('monthlyHeader').innerHTML=`<button class="cd-back" onclick="navTo('home')" title="返回">‹</button>
