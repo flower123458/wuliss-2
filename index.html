@@ -771,12 +771,13 @@ async function loadCloudData(){
 
 function renderStatsBar(){
   let totalStock=0,totalValue=0,low=0,out=0,inAmt=0,outAmt=0;
-  state.products.forEach(p=>{const s=calcStock(p.id);totalStock+=s;totalValue+=s*(p.purchasePrice||0);if(s<=0)out++;else if(s<=(p.safetyStock||0))low++;});
+  const costInfo=buildAvgCostMap();
+  state.products.forEach(p=>{const s=calcStock(p.id);totalStock+=s;totalValue+=s>0?s*currentAvgCost(costInfo,p.id,p):0;if(s<=0)out++;else if(s<=(p.safetyStock||0))low++;});
   state.transactions.forEach(t=>{if(t.type==='in')inAmt+=t.qty*(t.price||0);else outAmt+=t.qty*(t.price||0);});
   const cards=[
     {cls:'blue',icon:'📦',label:'商品大类',value:getCategories().length,sub:'个'},
     {cls:'green',icon:'📊',label:'总库存量',value:fmt(totalStock),sub:'件'},
-    {cls:'purple',icon:'💰',label:'库存价值',value:fmtMoney(totalValue),sub:'按采购价'},
+    {cls:'purple',icon:'💰',label:'库存价值',value:fmtMoney(totalValue),sub:'按移动加权'},
     {cls:'teal',icon:'📥',label:'累计入库',value:fmtMoney(inAmt),sub:`${state.transactions.filter(t=>t.type==='in').length}笔`},
     {cls:'red',icon:'📤',label:'累计出库',value:fmtMoney(outAmt),sub:`${state.transactions.filter(t=>t.type==='out').length}笔`},
   ];
@@ -795,7 +796,7 @@ function renderHome(){
   body.innerHTML=cats.map(cat=>{
     const items=getProductsByCategory(cat);
     const total=items.reduce((s,p)=>s+calcStock(p.id),0);
-    const value=items.reduce((s,p)=>s+calcStock(p.id)*(p.purchasePrice||0),0);
+    const value=items.reduce((s,p)=>{const sk=calcStock(p.id);return sk>0?sk*currentAvgCost(costInfo,p.id,p):0;},0);
     return `<tr style="cursor:pointer" onclick="navToCategory('${escapeHtml(cat)}')" onmouseover="this.style.background='var(--primary-light)'" onmouseout="this.style.background=''">
       <td><strong>${escapeHtml(cat)}</strong></td>
       <td class="text-right"><strong>${fmt(total)}</strong></td>
@@ -815,12 +816,14 @@ function renderAll(){
     items.forEach((p,i)=>{
       const stock=calcStock(p.id);const status=getStatus(p);
       const tag=status==='out'?`<span class="tag tag-out-stock">缺货</span>`:status==='low'?`<span class="tag tag-low">偏低</span>`:`<span class="tag tag-normal">正常</span>`;
+      const avgNow=currentAvgCost(costInfo,p.id,p);
+      const v=stock>0?stock*avgNow:0;
       html+=`<tr ${i===0?'style="border-top:2px solid #EDDCD2"':''}>
         ${i===0?`<td rowspan="${items.length}" style="vertical-align:middle;background:#FAF5F1;font-weight:600">${escapeHtml(cat)}</td>`:''}
         <td>${escapeHtml(p.sku)}</td>
         <td class="text-right">${p.purchasePrice?fmtMoney(p.purchasePrice):'—'}</td>
         <td class="text-right"><strong>${fmt(stock)}</strong></td>
-        <td class="text-right text-muted">${fmtMoney(stock*(p.purchasePrice||0))}</td>
+        <td class="text-right text-muted">${fmtMoney(v)}</td>
         <td class="text-center">${tag}</td>
         ${i===0?`<td rowspan="${items.length}" style="vertical-align:middle;background:#FAF5F1">${escapeHtml(p.location)||'—'}</td>`:''}
         <td class="text-center">${isAdmin()?`<button class="btn btn-danger btn-sm" onclick="deleteSku('${p.id}')">🗑️ 删除</button>`:'<span class="text-muted">—</span>'}</td>
@@ -847,15 +850,18 @@ function renderCategoryDetail(cat){
   if(items.length===0){navTo('home');return;}
   const p=items[0];
   const total=items.reduce((s,i)=>s+calcStock(i.id),0);
-  const totalValue=items.reduce((s,i)=>s+calcStock(i.id)*(i.purchasePrice||0),0);
+  const catInfo=buildAvgCostMap();
+  const totalValue=items.reduce((s,i)=>{const sk=calcStock(i.id);return sk>0?sk*currentAvgCost(catInfo,i.id,i):0;},0);
   document.getElementById('categoryDetailHeader').innerHTML=`<button class="cd-back" onclick="navTo('home')" title="返回">‹</button><div style="display:flex;justify-content:space-between;align-items:flex-start"><div class="cd-name">${escapeHtml(cat)}</div><div style="display:flex;gap:8px"><button class="btn btn-outline btn-sm" onclick="navTo('person-stock','${escapeHtml(cat)}')">👤 按人库存</button><button class="btn btn-primary btn-sm" onclick="navTo('expected','${escapeHtml(cat)}')">📋 到货表</button></div></div><div class="cd-meta">总库存：${fmt(total)} 件 | 库存价值：${fmtMoney(totalValue)} | 分类：${escapeHtml(p.location)||'—'}</div>`;
   document.getElementById('categoryDetailGrid').innerHTML=items.map(p=>{
     const stock=calcStock(p.id);const status=getStatus(p);
     const color=status==='out'?'#A04A42':status==='low'?'#C68A4A':'#7E8E76';
+    const avg=currentAvgCost(catInfo,p.id,p);
+    const v=stock>0?stock*avg:0;
     return `<div class="sku-card" onclick="openSkuActionModal('${escapeHtml(cat)}','${escapeHtml(p.sku)}')">
       <div class="sku-name">${escapeHtml(p.sku)}</div>
       <div class="sku-stock ${status}" style="color:${color}">${fmt(stock)}</div>
-      <div class="text-muted" style="font-size:10px">单价 ${p.purchasePrice?fmtMoney(p.purchasePrice):'未设'} · 价值 ${fmtMoney(stock*(p.purchasePrice||0))}</div>
+      <div class="text-muted" style="font-size:10px">加权成本 ${stock>0?fmtMoney(avg):'—'} · 价值 ${fmtMoney(v)}</div>
       <div class="sku-btns">
         <button class="btn btn-success btn-sm" onclick="event.stopPropagation();openInboundModal('${escapeHtml(cat)}','${escapeHtml(p.sku)}')">📥</button>
         <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();openOutboundModal('${escapeHtml(cat)}','${escapeHtml(p.sku)}')">📤</button>
@@ -938,7 +944,8 @@ function renderPersonStock(cat){
   const items=getProductsByCategory(cat);
   if(items.length===0){navTo('home');return;}
   const total=items.reduce((s,i)=>s+calcStock(i.id),0);
-  const totalValue=items.reduce((s,i)=>s+calcStock(i.id)*(i.purchasePrice||0),0);
+  const psInfo=buildAvgCostMap();
+  const totalValue=items.reduce((s,i)=>{const sk=calcStock(i.id);return sk>0?sk*currentAvgCost(psInfo,i.id,i):0;},0);
   const p=items[0];
   const op=personStockOperator||currentOperator||OPERATOR_OPTIONS[0];
   document.getElementById('personStockHeader').innerHTML=`<button class="cd-back" onclick="navTo('category-detail','${escapeHtml(cat)}')" title="返回">‹</button><div class="cd-name">${escapeHtml(cat)}</div><div class="cd-meta">总库存：${fmt(total)} 件 | 库存价值：${fmtMoney(totalValue)} | 分类：${escapeHtml(p.location)||'—'}</div>`;
@@ -1335,7 +1342,8 @@ async function exportExcel(s,e){
   s=s||'';e=e||'';
   const txs=filteredTransactions(s,e);
   const wb=XLSX.utils.book_new();
-  const stockRows=state.products.map(p=>{const stock=calcStock(p.id);const status=stock<=0?'缺货':stock<=(p.safetyStock||0)?'库存偏低':'正常';return{大类:p.category||'',SKU:p.sku||'',采购单价:p.purchasePrice||0,库存量:stock,库存价值:stock*(p.purchasePrice||0),安全库存:p.safetyStock||0,状态:status,分类:p.location||''};});
+  const expInfo=buildAvgCostMap();
+  const stockRows=state.products.map(p=>{const stock=calcStock(p.id);const status=stock<=0?'缺货':stock<=(p.safetyStock||0)?'库存偏低':'正常';const avg=currentAvgCost(expInfo,p.id,p);return{大类:p.category||'',SKU:p.sku||'',采购单价:p.purchasePrice||0,库存量:stock,库存价值:stock>0?stock*avg:0,安全库存:p.safetyStock||0,状态:status,分类:p.location||''};});
   const ws1=XLSX.utils.json_to_sheet(stockRows);
   ws1['!cols']=[{wch:12},{wch:12},{wch:10},{wch:8},{wch:10},{wch:8},{wch:8},{wch:10}];
   XLSX.utils.book_append_sheet(wb,ws1,'SKU库存清单');
@@ -1378,11 +1386,12 @@ function goToTxPage(p){txPagination.page=p;renderCategoryDetail(currentCategory)
 
 /* ===== 收益分析（仅统计已卖出=出库的货品） ===== */
 let profitFilter={start:'',end:'',channel:''};
-// 移动加权平均：逐商品按时序演进，返回 每笔出库交易id -> 该笔出库时的单件成本
+// 移动加权平均：逐商品按时序演进，返回 { txCost: 出库交易id->该笔出库成本, stockAvg: 商品id->当前库存加权均价 }
 function buildAvgCostMap(){
   const byProd={};
   state.transactions.forEach(t=>{if(t.type==='in'||t.type==='out'){(byProd[t.productId]=byProd[t.productId]||[]).push(t);}});
-  const map={};
+  const txCost={};
+  const stockAvg={};
   Object.values(byProd).forEach(list=>{
     list.sort((a,b)=>(a.date||'').localeCompare(b.date||'')||((a.createdAt||0)-(b.createdAt||0)));
     const prod=getProduct(list[0].productId);
@@ -1392,17 +1401,19 @@ function buildAvgCostMap(){
       if(t.type==='in'){qty+=t.qty;cost+=t.qty*(t.price||0);}
       else{
         const uc=qty>0?cost/qty:fb;
-        map[t.id]=uc;
+        txCost[t.id]=uc;
         if(qty>=t.qty){cost-=t.qty*uc;qty-=t.qty;}else{qty=0;cost=0;}
       }
     });
+    if(qty>0)stockAvg[list[0].productId]=cost/qty;
   });
-  return map;
+  return {txCost,stockAvg};
 }
-function avgCostOf(t,map,fb){const u=map[t.id];return u!==undefined?u:fb;}
+function avgCostOf(t,info,fb){const u=info.txCost[t.id];return u!==undefined?u:fb;}
+function currentAvgCost(info,pid,p){return info.stockAvg[pid]!==undefined?info.stockAvg[pid]:(p.purchasePrice||0);}
 function computeProfit(cat){
   const items=getProductsByCategory(cat);
-  const cm=buildAvgCostMap();
+  const info=buildAvgCostMap();
   return items.map(p=>{
     let txs=state.transactions.filter(t=>t.type==='out'&&t.productId===p.id);
     if(profitFilter.start)txs=txs.filter(t=>t.date>=profitFilter.start);
@@ -1410,7 +1421,7 @@ function computeProfit(cat){
     if(profitFilter.channel)txs=txs.filter(t=>t.salesChannel===profitFilter.channel);
     const soldQty=txs.reduce((a,t)=>a+t.qty,0);
     const revenue=txs.reduce((a,t)=>a+t.qty*(t.price||0),0);
-    const cost=txs.reduce((a,t)=>a+t.qty*avgCostOf(t,cm,p.purchasePrice||0),0);
+    const cost=txs.reduce((a,t)=>a+t.qty*avgCostOf(t,info,p.purchasePrice||0),0);
     const profit=revenue-cost;
     return {sku:p.sku,soldQty,revenue,cost,profit,margin:revenue>0?profit/revenue:0};
   }).filter(d=>d.soldQty>0).sort((a,b)=>b.profit-a.profit);
@@ -1556,11 +1567,11 @@ function renderMonthly(){
     </div>`;
   const outs=state.transactions.filter(t=>t.type==='out'&&ymOf(t.date)===m);
   const ins=state.transactions.filter(t=>t.type==='in'&&ymOf(t.date)===m);
-  const cm=buildAvgCostMap();
+  const info=buildAvgCostMap();
   let rev=0,pf=0,qty=0;
   const cat={},sku={},day={},chan={};
   outs.forEach(t=>{const p=getProduct(t.productId);if(!p)return;
-    const r=t.qty*(t.price||0),c=t.qty*avgCostOf(t,cm,p.purchasePrice||0),g=r-c;
+    const r=t.qty*(t.price||0),c=t.qty*avgCostOf(t,info,p.purchasePrice||0),g=r-c;
     rev+=r;pf+=g;qty+=t.qty;
     const ck=p.category||'未分类',sk=p.sku,dk=(t.date||'').slice(0,10),ch=t.salesChannel||'未填写';
     (cat[ck]=cat[ck]||{rev:0,pf:0}).rev+=r,(cat[ck].pf+=g);
