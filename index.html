@@ -790,6 +790,7 @@ function renderStatsBar(){
 function renderHome(){
   renderStatsBar();
   renderHomePendingApprovals();
+  const costInfo=buildAvgCostMap();
   const cats=getCategories();
   const body=document.getElementById('homeOverviewBody');
   if(cats.length===0){body.innerHTML=`<tr><td colspan="4"><div class="empty"><div class="icon">📦</div>暂无大类，点击左侧「新增大类」开始</div></td></tr>`;return;}
@@ -807,6 +808,7 @@ function renderHome(){
 }
 
 function renderAll(){
+  const costInfo=buildAvgCostMap();
   const cats=getCategories();
   const body=document.getElementById('allBody');
   if(state.products.length===0){body.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="icon">📦</div>暂无商品</div></td></tr>`;return;}
