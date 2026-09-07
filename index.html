@@ -797,7 +797,7 @@ function renderHome(){
   body.innerHTML=cats.map(cat=>{
     const items=getProductsByCategory(cat);
     const total=items.reduce((s,p)=>s+calcStock(p.id),0);
-    const value=items.reduce((s,p)=>{const sk=calcStock(p.id);return sk>0?sk*currentAvgCost(costInfo,p.id,p):0;},0);
+    const value=items.reduce((s,p)=>{const sk=calcStock(p.id);return s+(sk>0?sk*currentAvgCost(costInfo,p.id,p):0);},0);
     return `<tr style="cursor:pointer" onclick="navToCategory('${escapeHtml(cat)}')" onmouseover="this.style.background='var(--primary-light)'" onmouseout="this.style.background=''">
       <td><strong>${escapeHtml(cat)}</strong></td>
       <td class="text-right"><strong>${fmt(total)}</strong></td>
@@ -853,7 +853,7 @@ function renderCategoryDetail(cat){
   const p=items[0];
   const total=items.reduce((s,i)=>s+calcStock(i.id),0);
   const catInfo=buildAvgCostMap();
-  const totalValue=items.reduce((s,i)=>{const sk=calcStock(i.id);return sk>0?sk*currentAvgCost(catInfo,i.id,i):0;},0);
+  const totalValue=items.reduce((s,i)=>{const sk=calcStock(i.id);return s+(sk>0?sk*currentAvgCost(catInfo,i.id,i):0);},0);
   document.getElementById('categoryDetailHeader').innerHTML=`<button class="cd-back" onclick="navTo('home')" title="返回">‹</button><div style="display:flex;justify-content:space-between;align-items:flex-start"><div class="cd-name">${escapeHtml(cat)}</div><div style="display:flex;gap:8px"><button class="btn btn-outline btn-sm" onclick="navTo('person-stock','${escapeHtml(cat)}')">👤 按人库存</button><button class="btn btn-primary btn-sm" onclick="navTo('expected','${escapeHtml(cat)}')">📋 到货表</button></div></div><div class="cd-meta">总库存：${fmt(total)} 件 | 库存价值：${fmtMoney(totalValue)} | 分类：${escapeHtml(p.location)||'—'}</div>`;
   document.getElementById('categoryDetailGrid').innerHTML=items.map(p=>{
     const stock=calcStock(p.id);const status=getStatus(p);
@@ -947,7 +947,7 @@ function renderPersonStock(cat){
   if(items.length===0){navTo('home');return;}
   const total=items.reduce((s,i)=>s+calcStock(i.id),0);
   const psInfo=buildAvgCostMap();
-  const totalValue=items.reduce((s,i)=>{const sk=calcStock(i.id);return sk>0?sk*currentAvgCost(psInfo,i.id,i):0;},0);
+  const totalValue=items.reduce((s,i)=>{const sk=calcStock(i.id);return s+(sk>0?sk*currentAvgCost(psInfo,i.id,i):0);},0);
   const p=items[0];
   const op=personStockOperator||currentOperator||OPERATOR_OPTIONS[0];
   document.getElementById('personStockHeader').innerHTML=`<button class="cd-back" onclick="navTo('category-detail','${escapeHtml(cat)}')" title="返回">‹</button><div class="cd-name">${escapeHtml(cat)}</div><div class="cd-meta">总库存：${fmt(total)} 件 | 库存价值：${fmtMoney(totalValue)} | 分类：${escapeHtml(p.location)||'—'}</div>`;
