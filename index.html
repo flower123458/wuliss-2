@@ -551,7 +551,7 @@ tbody tr:last-child td{border-bottom:none}
     <div class="modal-body">
       <div class="form-row">
         <div class="form-group"><label>大类 <span class="req">*</span></label><select id="inCategory" onchange="onInCategoryChange()"></select></div>
-        <div class="form-group"><label>SKU <span class="req">*</span></label><select id="inSku"></select></div>
+        <div class="form-group"><label>SKU <span class="req">*</span></label><input type="text" id="inSku" list="inSkuList" autocomplete="off" placeholder="选择或输入新SKU"><datalist id="inSkuList"></datalist></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label>入库数量 <span class="req">*</span></label><input type="number" id="inQty" min="1" placeholder="数量"></div>
@@ -574,7 +574,7 @@ tbody tr:last-child td{border-bottom:none}
     <div class="modal-body">
       <div class="form-row">
         <div class="form-group"><label>大类 <span class="req">*</span></label><select id="outCategory" onchange="onOutCategoryChange()"></select></div>
-        <div class="form-group"><label>SKU <span class="req">*</span></label><select id="outSku"></select></div>
+        <div class="form-group"><label>SKU <span class="req">*</span></label><input type="text" id="outSku" list="outSkuList" autocomplete="off" placeholder="请选择SKU"><datalist id="outSkuList"></datalist></div>
       </div>
       <div class="form-row-3">
         <div class="form-group"><label>出库数量 <span class="req">*</span></label><input type="number" id="outQty" min="1" placeholder="数量" oninput="checkOutStock()"></div>
@@ -725,7 +725,9 @@ function navToCategory(cat){navTo('category-detail',cat);}
 function filterSidebar(){const q=(document.getElementById('sidebarSearch').value||'').toLowerCase();document.querySelectorAll('.cat-item').forEach(item=>{const name=item.dataset.cat.toLowerCase();item.style.display=name.includes(q)?'':'none';});}
 
 function getCategories(){return [...new Set(state.products.map(p=>p.category).filter(Boolean))].sort();}
-function getProductsByCategory(cat){return state.products.filter(p=>p.category===cat).sort((a,b)=>SKU_OPTIONS.indexOf(a.sku)-SKU_OPTIONS.indexOf(b.sku));}
+function allSkuNames(){return [...new Set(state.products.map(p=>p.sku).filter(Boolean))].sort((a,b)=>{const ia=SKU_OPTIONS.indexOf(a),ib=SKU_OPTIONS.indexOf(b);if(ia<0&&ib<0)return String(a).localeCompare(String(b),'zh');if(ia<0)return 1;if(ib<0)return -1;return ia-ib;});}
+function fillSkuFilter(sel,cur){if(!sel)return;sel.innerHTML='<option value="">全部SKU</option>'+allSkuNames().map(s=>`<option value="${escapeHtml(s)}" ${s===cur?'selected':''}>${escapeHtml(s)}</option>`).join('');}
+function getProductsByCategory(cat){return state.products.filter(p=>p.category===cat).sort((a,b)=>{const ia=SKU_OPTIONS.indexOf(a.sku),ib=SKU_OPTIONS.indexOf(b.sku);if(ia<0&&ib<0)return String(a.sku).localeCompare(String(b.sku),'zh');if(ia<0)return 1;if(ib<0)return -1;return ia-ib;});}
 function getTotalStock(cat){return getProductsByCategory(cat).reduce((sum,p)=>sum+calcStock(p.id),0);}
 function findProduct(cat,sku){return state.products.find(p=>p.category===cat&&p.sku===sku)}
 
@@ -861,7 +863,7 @@ function renderCategoryDetail(cat){
   const total=items.reduce((s,i)=>s+calcStock(i.id),0);
   const catInfo=buildAvgCostMap();
   const totalValue=items.reduce((s,i)=>{const sk=calcStock(i.id);return s+(sk>0?sk*currentAvgCost(catInfo,i.id,i):0);},0);
-  document.getElementById('categoryDetailHeader').innerHTML=`<button class="cd-back" onclick="navTo('home')" title="返回">‹</button><div style="display:flex;justify-content:space-between;align-items:flex-start"><div class="cd-name">${escapeHtml(cat)}</div><div style="display:flex;gap:8px"><button class="btn btn-outline btn-sm" onclick="navTo('person-stock','${escapeHtml(cat)}')">👤 按人库存</button><button class="btn btn-primary btn-sm" onclick="navTo('expected','${escapeHtml(cat)}')">📋 到货表</button></div></div><div class="cd-meta">总库存：${fmt(total)} 件 | 库存价值：${fmtMoney(totalValue)} | 分类：${escapeHtml(p.location)||'—'}</div>`;
+  document.getElementById('categoryDetailHeader').innerHTML=`<button class="cd-back" onclick="navTo('home')" title="返回">‹</button><div style="display:flex;justify-content:space-between;align-items:flex-start"><div class="cd-name">${escapeHtml(cat)}</div><div style="display:flex;gap:8px;flex-wrap:wrap">${isAdmin()?'<button class="btn btn-outline btn-sm" onclick="addSku(\''+escapeHtml(cat)+'\')">➕ 新增SKU</button>':''}<button class="btn btn-outline btn-sm" onclick="navTo('person-stock','${escapeHtml(cat)}')">👤 按人库存</button><button class="btn btn-primary btn-sm" onclick="navTo('expected','${escapeHtml(cat)}')">📋 到货表</button></div></div><div class="cd-meta">总库存：${fmt(total)} 件 | 库存价值：${fmtMoney(totalValue)} | 分类：${escapeHtml(p.location)||'—'}</div>`;
   document.getElementById('categoryDetailGrid').innerHTML=items.map(p=>{
     const stock=calcStock(p.id);const status=getStatus(p);
     const color=status==='out'?'#A04A42':status==='low'?'#C68A4A':'#7E8E76';
@@ -1041,33 +1043,75 @@ function openInboundModal(prefillCat,prefillSku){
 }
 function fillInSku(selId,cat,prefillSku){
   const sel=document.getElementById(selId);
-  if(!cat){sel.innerHTML='<option value="">— 请先选择大类 —</option>';return;}
+  const list=document.getElementById(selId+'List');
+  if(!cat){sel.value='';sel.placeholder='— 请先选择大类 —';if(list)list.innerHTML='';return;}
   const items=getProductsByCategory(cat);
-  sel.innerHTML=items.map(p=>`<option value="${escapeHtml(p.sku)}" ${p.sku===prefillSku?'selected':''}>${escapeHtml(p.sku)}</option>`).join('');
-  // 选SKU变化时自动带出价格
-  sel.onchange=()=>{
+  sel.placeholder=selId==='inSku'?'选择或输入新SKU':'请选择SKU';
+  sel.value=prefillSku||'';
+  if(list)list.innerHTML=items.map(p=>`<option value="${escapeHtml(p.sku)}">`).join('');
+  // 选/输入SKU时自动带出价格
+  const sync=()=>{
     const p=findProduct(cat,sel.value);
     const priceInput=selId==='inSku'?'inPrice':'outPrice';
     document.getElementById(priceInput).value=p&&p.purchasePrice?p.purchasePrice:'';
     if(selId==='outSku')checkOutStock();
   };
+  sel.onchange=sync;sel.oninput=sync;
 }
 function onInCategoryChange(){const cat=document.getElementById('inCategory').value;fillInSku('inSku',cat,null);const p=findProduct(cat,document.getElementById('inSku').value);document.getElementById('inPrice').value=p&&p.purchasePrice?p.purchasePrice:'';}
+// 大类下没有该SKU时自动建档（入库用）
+async function ensureProduct(cat,sku,price){
+  let p=findProduct(cat,sku);
+  if(p)return p;
+  const ref=getProductsByCategory(cat)[0];
+  const newP={id:uid(),name:cat+'-'+sku,sku,category:cat,location:ref?(ref.location||''):'',purchasePrice:price||0,safetyStock:0,notes:'',createdAt:Date.now()};
+  try{
+    await Cloud.insertProduct(newP);
+    await loadCloudData();
+    p=findProduct(cat,sku);
+  }catch(e){console.error(e);}
+  return p;
+}
+// 大类详情页：手动新增SKU
+async function addSku(cat){
+  if(!isAdmin()){toast('仅管理员(11)可新增SKU','error');return;}
+  const name=prompt(`在「${cat}」下新增 SKU\n\n请输入 SKU 名称（如：王橹杰）：`);
+  if(name===null)return;
+  const sku=(name||'').trim();
+  if(!sku){toast('请输入SKU名称','error');return;}
+  if(findProduct(cat,sku)){toast(`「${sku}」在该大类下已存在`,'error');return;}
+  const priceRaw=prompt(`「${sku}」的进货单价（元）：`,'0');
+  if(priceRaw===null)return;
+  const price=parseFloat(priceRaw)||0;
+  try{
+    const ref=getProductsByCategory(cat)[0];
+    await Cloud.insertProduct({id:uid(),name:cat+'-'+sku,sku,category:cat,location:ref?(ref.location||''):'',purchasePrice:price,safetyStock:0,notes:'',createdAt:Date.now()});
+    await loadCloudData();toast(`已新增「${sku}」`,'success');
+  }catch(e){console.error(e);toast('新增失败，请重试','error');}
+}
 async function saveInbound(){
   if(window._saving){return;}
   const cat=document.getElementById('inCategory').value;
   const sku=document.getElementById('inSku').value;
   const qty=parseInt(document.getElementById('inQty').value);
-  if(!cat||!sku){toast('请选择大类和SKU','error');return;}
+  if(!cat||!sku){toast('请填写大类和SKU','error');return;}
   if(!qty||qty<=0){toast('请填写正确的入库数量','error');return;}
+  let p=findProduct(cat,sku);
+  const inPriceVal=parseFloat(document.getElementById('inPrice').value)||(p&&p.purchasePrice)||0;
+  if(!p){
+    if(!confirm(`大类「${cat}」下还没有 SKU「${sku}」\n将按进货单价 ${inPriceVal} 元自动创建这个新品，确认吗？\n\n（若只是打错了字，请点取消）`))return;
+  }
   if(!confirm(`确认入库？\n\n大类：${cat}\nSKU：${sku}\n数量：+${qty}\n入库人：${document.getElementById('inOperator').value}`))return;
   window._saving=true;
   const btn=event.target;btn.disabled=true;btn.textContent='提交中...';
-  const p=findProduct(cat,sku);
-  const price=parseFloat(document.getElementById('inPrice').value)||(p&&p.purchasePrice)||0;
+  const price=inPriceVal;
   const dateRaw=document.getElementById('inDate').value;
   const dateStr=dateRaw?dateRaw.replace('T',' ')+':00':nowTime();
   try{
+    if(!p){
+      p=await ensureProduct(cat,sku,price);
+      if(!p){toast('创建新品失败','error');window._saving=false;btn.disabled=false;btn.textContent='确认入库';return;}
+    }
     await Cloud.insertTransaction({id:uid(),type:'in',productId:p.id,qty,price,date:dateStr,operator:document.getElementById('inOperator').value,notes:document.getElementById('inNotes').value.trim(),createdAt:Date.now()});
     closeModal('inboundModal');await loadCloudData();
     toast(`入库成功：${cat} ${sku} +${qty}`,'success');
@@ -1077,7 +1121,7 @@ async function saveInbound(){
 function renderInbound(){
   const cats=getCategories();
   const catSel=document.getElementById('filterInCat');const curCat=catSel.value;catSel.innerHTML='<option value="">全部大类</option>'+cats.map(c=>`<option value="${escapeHtml(c)}" ${c===curCat?'selected':''}>${escapeHtml(c)}</option>`).join('');
-  const skuSel=document.getElementById('filterInSku');const curSku=skuSel.value;skuSel.innerHTML='<option value="">全部SKU</option>'+SKU_OPTIONS.map(s=>`<option value="${escapeHtml(s)}" ${s===curSku?'selected':''}>${escapeHtml(s)}</option>`).join('');
+  const skuSel=document.getElementById('filterInSku');const curSku=skuSel.value;fillSkuFilter(skuSel,curSku);
   const opSel=document.getElementById('filterInOperator');const curOp=opSel.value;opSel.innerHTML='<option value="">全部入库人</option>'+OPERATOR_OPTIONS.map(o=>`<option value="${escapeHtml(o)}" ${o===curOp?'selected':''}>${escapeHtml(o)}</option>`).join('');
   const catF=document.getElementById('filterInCat').value,skuF=document.getElementById('filterInSku').value,opF=document.getElementById('filterInOperator').value,start=document.getElementById('filterInStart').value,end=document.getElementById('filterInEnd').value;
   let rows=state.transactions.filter(t=>t.type==='in');
@@ -1133,7 +1177,9 @@ async function saveOutbound(){
   const cat=document.getElementById('outCategory').value;const sku=document.getElementById('outSku').value;
   const qty=parseInt(document.getElementById('outQty').value);
   if(!cat||!sku){toast('请选择大类和SKU','error');return;}if(!qty||qty<=0){toast('请填写正确的出库数量','error');return;}
-  const p=findProduct(cat,sku);const stock=p?calcStock(p.id):0;
+  const p=findProduct(cat,sku);
+  if(!p){toast(`大类「${cat}」下没有 SKU「${sku}」，请先在入库时创建`,'error');return;}
+  const stock=calcStock(p.id);
   if(qty>stock&&!confirm(`当前库存仅 ${stock} 件，确定要出库 ${qty} 件吗？`))return;
   if(!confirm(`确认出库？\n\n大类：${cat}\nSKU：${sku}\n数量：-${qty}\n出库人：${document.getElementById('outOperator').value}`))return;
   window._saving=true;
@@ -1151,7 +1197,7 @@ async function saveOutbound(){
 function renderOutbound(){
   const cats=getCategories();
   const catSel=document.getElementById('filterOutCat');const curCat=catSel.value;catSel.innerHTML='<option value="">全部大类</option>'+cats.map(c=>`<option value="${escapeHtml(c)}" ${c===curCat?'selected':''}>${escapeHtml(c)}</option>`).join('');
-  const skuSel=document.getElementById('filterOutSku');const curSku=skuSel.value;skuSel.innerHTML='<option value="">全部SKU</option>'+SKU_OPTIONS.map(s=>`<option value="${escapeHtml(s)}" ${s===curSku?'selected':''}>${escapeHtml(s)}</option>`).join('');
+  const skuSel=document.getElementById('filterOutSku');const curSku=skuSel.value;fillSkuFilter(skuSel,curSku);
   const opSel=document.getElementById('filterOutOperator');const curOp=opSel.value;opSel.innerHTML='<option value="">全部出库人</option>'+OPERATOR_OPTIONS.map(o=>`<option value="${escapeHtml(o)}" ${o===curOp?'selected':''}>${escapeHtml(o)}</option>`).join('');
   const chSel=document.getElementById('filterOutChannel');const curCh=chSel.value;chSel.innerHTML='<option value="">全部渠道</option>'+['微店','闲鱼','抖音','微信','线下'].map(c=>`<option value="${c}" ${c===curCh?'selected':''}>${c}</option>`).join('');
   const catF=document.getElementById('filterOutCat').value,skuF=document.getElementById('filterOutSku').value,opF=document.getElementById('filterOutOperator').value,chF=document.getElementById('filterOutChannel').value,start=document.getElementById('filterOutStart').value,end=document.getElementById('filterOutEnd').value;
