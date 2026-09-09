@@ -1469,10 +1469,10 @@ function buildAvgCostMap(){
       const openAvg=oq>0?oc/oq:null;
       const mAvg=openAvg!==null?openAvg:(m.inQ>0?m.inC/m.inQ:fb);
       m.outs.forEach(t=>{txCost[t.id]=mAvg;});
-      let cq=oq+m.inQ,cc=oc+m.inC;
-      const used=Math.min(m.outQ,cq);
-      cq-=used;
-      if(cq<=0){cq=0;cc=0;}else{cc=Math.max(0,cc-used*mAvg);}
+      // 结存允许为负：偶发"先出后入"(删单重录导致)时让库存穿透为负、由后续入库冲抵，
+      // 避免凭空多出期末结存而抬高下月出库成本；负结存视为无库存价值。
+      let cq=oq+m.inQ-m.outQ,cc=oc+m.inC-m.outQ*mAvg;
+      if(cq<=0)cc=0;else cc=Math.max(0,cc);
       oq=cq;oc=cc;
     });
     if(oq>0)stockAvg[list[0].productId]=oc/oq;
