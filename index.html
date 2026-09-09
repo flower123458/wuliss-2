@@ -1443,6 +1443,10 @@ function goToTxPage(p){txPagination.page=p;renderCategoryDetail(currentCategory)
 let profitFilter={start:'',end:'',channel:''};
 // 移动加权平均：逐商品按时序演进，返回 { txCost: 出库交易id->该笔出库成本, stockAvg: 商品id->当前库存加权均价 }
 function buildAvgCostMap(){
+  // 成本口径：月末封账加权平均。
+  // 每月出库统一按「上月末结存库存的加权均价」计成本（本月新入库不影响本月出库成本）；
+  // 本月末均价=(上月末结存成本+本月入库成本)/(上月末结存数量+本月入库数量)，供下月出库使用；
+  // 已过月份一经算定不再受之后入库影响（封账）。
   const byProd={};
   state.transactions.forEach(t=>{if(t.type==='in'||t.type==='out'){(byProd[t.productId]=byProd[t.productId]||[]).push(t);}});
   const txCost={};
@@ -1451,16 +1455,27 @@ function buildAvgCostMap(){
     list.sort((a,b)=>(a.date||'').localeCompare(b.date||'')||((a.createdAt||0)-(b.createdAt||0)));
     const prod=getProduct(list[0].productId);
     const fb=prod?(prod.purchasePrice||0):0;
-    let qty=0,cost=0;
+    const months=[];
     list.forEach(t=>{
-      if(t.type==='in'){qty+=t.qty;cost+=t.qty*(t.price||0);}
-      else{
-        const uc=qty>0?cost/qty:fb;
-        txCost[t.id]=uc;
-        if(qty>=t.qty){cost-=t.qty*uc;qty-=t.qty;}else{qty=0;cost=0;}
-      }
+      const ym=(t.date||'').slice(0,7);
+      const last=months[months.length-1];
+      if(!last||last.ym!==ym)months.push({ym:ym,inQ:0,inC:0,outQ:0,outs:[]});
+      const m=months[months.length-1];
+      if(t.type==='in'){m.inQ+=t.qty||0;m.inC+=(t.qty||0)*(t.price||0);}
+      else{m.outs.push(t);m.outQ+=t.qty||0;}
     });
-    if(qty>0)stockAvg[list[0].productId]=cost/qty;
+    let oq=0,oc=0;
+    months.forEach(m=>{
+      const openAvg=oq>0?oc/oq:null;
+      const mAvg=openAvg!==null?openAvg:(m.inQ>0?m.inC/m.inQ:fb);
+      m.outs.forEach(t=>{txCost[t.id]=mAvg;});
+      let cq=oq+m.inQ,cc=oc+m.inC;
+      const used=Math.min(m.outQ,cq);
+      cq-=used;
+      if(cq<=0){cq=0;cc=0;}else{cc=Math.max(0,cc-used*mAvg);}
+      oq=cq;oc=cc;
+    });
+    if(oq>0)stockAvg[list[0].productId]=oc/oq;
   });
   return {txCost,stockAvg};
 }
