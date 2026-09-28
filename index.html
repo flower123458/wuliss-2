@@ -709,6 +709,19 @@ tbody tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+<div class="modal-overlay" id="shipRemindModal">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header" style="border-bottom:none;padding-bottom:0">
+      <h3>🚚 今日发货提醒</h3>
+    </div>
+    <div class="modal-body" id="shipRemindBody" style="padding-top:8px;line-height:1.8;color:var(--text)"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeShipRemind()">知道了</button>
+      <button class="btn btn-primary" onclick="markShippedToday()">已发货</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const SKU_OPTIONS=['家族款','王橹杰','杨博文','张桂源','陈浚铭','左奇函','张函瑞','陈奕恒','陈思罕','张奕然','李煜东','杨涵博','魏子宸','官俊臣','王烁然','聂玮辰'];
 const SKU_GROUPS={
@@ -858,6 +871,7 @@ function renderStatsBar(){
     {cls:'purple',icon:'💰',label:'库存价值',value:fmtMoney(totalValue),sub:'按移动加权'},
     {cls:'teal',icon:'📥',label:'累计入库',value:fmtMoney(inAmt),sub:`${state.transactions.filter(t=>t.type==='in').length}笔`},
     {cls:'red',icon:'📤',label:'累计出库',value:fmtMoney(outAmt),sub:`${state.transactions.filter(t=>t.type==='out').length}笔`},
+    shipTodayCard(),
   ];
   document.getElementById('statsBar').innerHTML=cards.map(c=>`<div class="stat-card"><div class="stat-icon ${c.cls}">${c.icon}</div><div class="stat-info"><div class="label">${c.label}</div><div class="value">${c.value}</div><div class="sub">${c.sub}</div></div></div>`).join('');
   document.getElementById('nav-all').textContent=state.products.length;
@@ -1982,6 +1996,33 @@ function exportShipCsv(){
   toast('已导出 CSV','success');
 }
 
+// ===== 首页「今日发货」卡片 + 今日发货弹窗提醒 =====
+function shipTodayCard(){
+  const t=today();
+  const names=[...new Set(getShipList().filter(s=>s.date===t).map(s=>s.assignee))];
+  const value=names.length?names.join('、'):'无排班';
+  const sub=names.length?`${names.length}人 · 今日发货`:'今日未安排';
+  return {cls:'orange',icon:'🚚',label:'今日发货',value,sub};
+}
+function shipTodayDoneKey(op){return `wuliss_ship_done_${today()}_${op}`;}
+function maybeShowShipRemind(){
+  if(!currentOperator)return;
+  const todayStr=today();
+  const scheduled=getShipList().filter(s=>s.date===todayStr&&s.assignee===currentOperator);
+  if(scheduled.length===0)return;
+  if(localStorage.getItem(shipTodayDoneKey(currentOperator)))return;
+  const body=document.getElementById('shipRemindBody');
+  if(body)body.innerHTML=`今天（<b>${todayStr}</b>）轮到 <b style="color:var(--primary)">${escapeHtml(currentOperator)}</b> 发货啦～<br>请记得按时发出今天的订单，发货完成后点击「已发货」即可。`;
+  const m=document.getElementById('shipRemindModal');
+  if(m)m.classList.add('show');
+}
+function closeShipRemind(){const m=document.getElementById('shipRemindModal');if(m)m.classList.remove('show');}
+function markShippedToday(){
+  if(currentOperator)localStorage.setItem(shipTodayDoneKey(currentOperator),'1');
+  closeShipRemind();
+  toast('已记录今日发货，今天不再提醒','success');
+}
+
 function initApp(){
   applyCatNavCollapsedState();
   const btnClear=document.getElementById('btnClearAll');
@@ -1990,6 +2031,7 @@ function initApp(){
   renderStatsBar();renderCatNav();renderHome();calcPricing();updateShipBadge();
   loadCloudData();
   setInterval(()=>{loadCloudData();},30000);
+  maybeShowShipRemind();
 }
 
 if(checkAuth()){
