@@ -220,20 +220,21 @@ tbody tr:last-child td{border-bottom:none}
 .mini-bar>div{height:100%;background:var(--primary);border-radius:4px;min-width:1px}
 .ship-week{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
 .ship-col{display:flex;flex-direction:column;gap:4px;min-width:0}
-.ship-wd{text-align:center;font-size:11px;color:var(--muted);padding:4px 0;font-weight:600;border-bottom:1px solid var(--border)}
-.ship-cell{border:1px solid var(--border);border-radius:8px;min-height:96px;padding:4px;display:flex;flex-direction:column;gap:4px;background:var(--card);min-width:0}
+.ship-wd{text-align:center;font-size:12px;color:var(--muted);padding:5px 0;font-weight:600;border-bottom:1px solid var(--border)}
+.ship-cell{border:1px solid var(--border);border-radius:10px;min-height:120px;padding:6px;display:flex;flex-direction:column;gap:6px;background:var(--card);min-width:0}
 .ship-cell.today{background:var(--primary-light);border-color:var(--primary)}
-.ship-date{font-size:10px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:2px}
-.ship-date b{font-size:9px;color:var(--primary);background:#fff;padding:0 4px;border-radius:6px;flex-shrink:0}
-.ship-chip{font-size:11px;padding:3px 4px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;gap:3px;cursor:pointer;line-height:1.2;min-width:0}
+.ship-date{font-size:11px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:2px}
+.ship-date b{font-size:10px;color:var(--primary);background:#fff;padding:1px 6px;border-radius:8px;flex-shrink:0}
+.ship-chip{font-size:13px;font-weight:600;letter-spacing:.5px;padding:8px 10px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:4px;cursor:pointer;line-height:1.3;min-width:0}
 .ship-chip>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ship-x{flex-shrink:0;opacity:.55;font-size:10px}
+.chip-note{font-weight:400;font-size:11px}
+.ship-x{flex-shrink:0;opacity:.7;font-size:12px}
 .ship-x:hover{opacity:1}
-.ship-add{margin-top:auto;text-align:center;font-size:11px;color:var(--muted);cursor:pointer;border:1px dashed var(--border);border-radius:6px;padding:3px 0}
+.ship-add{margin-top:auto;text-align:center;font-size:11px;color:var(--muted);cursor:pointer;border:1px dashed var(--border);border-radius:6px;padding:4px 0}
 .ship-add:hover{color:var(--primary);border-color:var(--primary)}
 @media(max-width:768px){
   .ship-week{grid-template-columns:repeat(4,1fr)}
-  .ship-cell{min-height:84px}
+  .ship-cell{min-height:110px}
   .chip-note{display:none}
   .ship-add .add-txt{display:none}
 }
@@ -1870,7 +1871,7 @@ function logout(){
 const SHIP_KEY='wuliss_ship_v2';
 const SHIP_WD=['周日','周一','周二','周三','周四','周五','周六'];
 const SHIP_WD_NAMES=['周一','周二','周三','周四','周五','周六','周日'];
-const SHIP_PERSON_COLORS={'11':{bg:'#E8F0FE',fg:'#1A56C4'},'笋笋':{bg:'#FDF0E6',fg:'#B26A00'},'小碗':{bg:'#E9F7EF',fg:'#1E7E45'}};
+const SHIP_PERSON_COLORS={'11':{bg:'#2f6fe4',fg:'#ffffff'},'笋笋':{bg:'#e8862c',fg:'#ffffff'},'小碗':{bg:'#2a9d5c',fg:'#ffffff'}};
 let shipWeekStart='';
 function getShipList(){try{return JSON.parse(localStorage.getItem(SHIP_KEY)||'[]');}catch(e){return [];}}
 function saveShipList(arr){localStorage.setItem(SHIP_KEY,JSON.stringify(arr));}
@@ -1902,7 +1903,7 @@ function renderShipping(){
     const wn=SHIP_WD_NAMES[i];
     const dayEntries=list.filter(s=>s.date===ds&&(!curOp||s.assignee===curOp));
     const chips=dayEntries.map(s=>{
-      const c=SHIP_PERSON_COLORS[s.assignee]||{bg:'#eee',fg:'#333'};
+      const c=SHIP_PERSON_COLORS[s.assignee]||{bg:'#6b7280',fg:'#ffffff'};
       const note=s.notes?`<span class="chip-note"> · ${escapeHtml(s.notes)}</span>`:'';
       return `<div class="ship-chip" style="background:${c.bg};color:${c.fg}" title="${escapeHtml(s.notes||'')}" onclick="openShipModal('${s.id}')"><span>${escapeHtml(s.assignee)}${note}</span><span class="ship-x" onclick="event.stopPropagation();deleteShip('${s.id}')">✕</span></div>`;
     }).join('');
