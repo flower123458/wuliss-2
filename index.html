@@ -231,6 +231,8 @@ tbody tr:last-child td{border-bottom:none}
 .ship-chip .chip-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chip-note{font-weight:400;opacity:.85}
 .ship-x{flex-shrink:0;margin-left:auto;opacity:.4;font-size:11px;padding:0 2px}
+.ship-chip.done{opacity:.7}
+.chip-done{width:16px;height:16px;border-radius:50%;background:var(--success);color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:700}
 .ship-x:hover{opacity:1}
 .ship-add{margin-top:auto;text-align:center;font-size:12px;color:var(--muted);cursor:pointer;border:1px dashed var(--border);border-radius:10px;padding:5px 0;transition:.15s}
 .ship-add:hover{color:var(--primary);border-color:var(--primary);background:var(--primary-light)}
@@ -1927,8 +1929,9 @@ function renderShipping(){
     const chips=dayEntries.map(s=>{
       const c=SHIP_PERSON_COLORS[s.assignee]||{c:'#9aa0a6',soft:'rgba(154,160,166,.18)',text:'#5f6368'};
       const initial=escapeHtml(String(s.assignee||'?').charAt(0));
+      const isDone=s.date===todayStr&&localStorage.getItem(shipTodayDoneKey(s.assignee))==='1';
       const note=s.notes?`<span class="chip-note"> · ${escapeHtml(s.notes)}</span>`:'';
-      return `<div class="ship-chip" style="background:${c.soft};color:${c.text}" title="${escapeHtml(s.notes||'')}" onclick="openShipModal('${s.id}')"><span class="chip-avatar" style="background:${c.c}">${initial}</span><span class="chip-name">${escapeHtml(s.assignee)}${note}</span><span class="ship-x" onclick="event.stopPropagation();deleteShip('${s.id}')">✕</span></div>`;
+      return `<div class="ship-chip${isDone?' done':''}" style="background:${c.soft};color:${c.text}" title="${isDone?'已完成今日发货':escapeHtml(s.notes||'')}" onclick="openShipModal('${s.id}')"><span class="chip-avatar" style="background:${c.c}">${initial}</span><span class="chip-name">${escapeHtml(s.assignee)}${note}</span>${isDone?'<span class="chip-done" title="已完成">✓</span>':''}<span class="ship-x" onclick="event.stopPropagation();deleteShip('${s.id}')">✕</span></div>`;
     }).join('');
     html+=`<div class="ship-col"><div class="ship-wd">${wn}</div><div class="ship-cell${isToday?' today':''}"><div class="ship-date"><span class="d-num">${ds.slice(5)}</span>${isToday?'<b>今<span class="tdy-txt">天</span></b>':''}</div>${chips}<div class="ship-add" title="新增排班" onclick="openShipModal('','${ds}')">+<span class="add-txt"> 排班</span></div></div></div>`;
   }
@@ -2000,9 +2003,10 @@ function exportShipCsv(){
 function shipTodayCard(){
   const t=today();
   const names=[...new Set(getShipList().filter(s=>s.date===t).map(s=>s.assignee))];
-  const value=names.length?names.join('、'):'无排班';
-  const sub=names.length?`${names.length}人 · 今日发货`:'今日未安排';
-  return {cls:'orange',icon:'🚚',label:'今日发货',value,sub};
+  if(!names.length)return {cls:'orange',icon:'🚚',label:'今日发货',value:'无排班',sub:'今日未安排'};
+  const doneN=names.filter(n=>localStorage.getItem(shipTodayDoneKey(n))==='1').length;
+  const sub=doneN>=names.length?'已全部发货 ✓':(doneN>0?`已发货 ${doneN}/${names.length}`:`${names.length}人 · 今日发货`);
+  return {cls:'orange',icon:'🚚',label:'今日发货',value:names.join('、'),sub};
 }
 function shipTodayDoneKey(op){return `wuliss_ship_done_${today()}_${op}`;}
 function maybeShowShipRemind(){
@@ -2020,7 +2024,9 @@ function closeShipRemind(){const m=document.getElementById('shipRemindModal');if
 function markShippedToday(){
   if(currentOperator)localStorage.setItem(shipTodayDoneKey(currentOperator),'1');
   closeShipRemind();
-  toast('已记录今日发货，今天不再提醒','success');
+  renderStatsBar();
+  renderShipping();
+  toast('已完成今日发货 ✓','success');
 }
 
 function initApp(){
