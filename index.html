@@ -218,7 +218,8 @@ tbody tr:last-child td{border-bottom:none}
 .mc-legend em{margin-left:auto;font-style:normal;color:#c99;max-width:70%;text-align:right;line-height:1.5}
 .chart-empty{text-align:center;color:var(--muted);font-size:12px;padding:24px 0}
 .mini-bar>div{height:100%;background:var(--primary);border-radius:4px;min-width:1px}
-.ship-week{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.ship-week{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+.ship-col{display:flex;flex-direction:column;gap:4px;min-width:0}
 .ship-wd{text-align:center;font-size:11px;color:var(--muted);padding:4px 0;font-weight:600;border-bottom:1px solid var(--border)}
 .ship-cell{border:1px solid var(--border);border-radius:8px;min-height:96px;padding:4px;display:flex;flex-direction:column;gap:4px;background:var(--card);min-width:0}
 .ship-cell.today{background:var(--primary-light);border-color:var(--primary)}
@@ -231,6 +232,7 @@ tbody tr:last-child td{border-bottom:none}
 .ship-add{margin-top:auto;text-align:center;font-size:11px;color:var(--muted);cursor:pointer;border:1px dashed var(--border);border-radius:6px;padding:3px 0}
 .ship-add:hover{color:var(--primary);border-color:var(--primary)}
 @media(max-width:768px){
+  .ship-week{grid-template-columns:repeat(4,1fr)}
   .ship-cell{min-height:84px}
   .chip-note{display:none}
   .ship-add .add-txt{display:none}
@@ -1894,17 +1896,17 @@ function renderShipping(){
   const mon=shipWeekStart,sun=addDaysStr(mon,6),todayStr=today();
   const lbl=document.getElementById('shipWeekLabel');if(lbl)lbl.textContent=`${mon.slice(5)} ~ ${sun.slice(5)}`;
   let html='<div class="ship-week">';
-  SHIP_WD_NAMES.forEach(wn=>{html+=`<div class="ship-wd">${wn}</div>`;});
   for(let i=0;i<7;i++){
     const ds=addDaysStr(mon,i);
     const isToday=ds===todayStr;
+    const wn=SHIP_WD_NAMES[i];
     const dayEntries=list.filter(s=>s.date===ds&&(!curOp||s.assignee===curOp));
     const chips=dayEntries.map(s=>{
       const c=SHIP_PERSON_COLORS[s.assignee]||{bg:'#eee',fg:'#333'};
       const note=s.notes?`<span class="chip-note"> · ${escapeHtml(s.notes)}</span>`:'';
       return `<div class="ship-chip" style="background:${c.bg};color:${c.fg}" title="${escapeHtml(s.notes||'')}" onclick="openShipModal('${s.id}')"><span>${escapeHtml(s.assignee)}${note}</span><span class="ship-x" onclick="event.stopPropagation();deleteShip('${s.id}')">✕</span></div>`;
     }).join('');
-    html+=`<div class="ship-cell${isToday?' today':''}"><div class="ship-date"><span>${ds.slice(5)}</span>${isToday?'<b>今天</b>':''}</div>${chips}<div class="ship-add" title="新增排班" onclick="openShipModal('','${ds}')">+<span class="add-txt"> 排班</span></div></div>`;
+    html+=`<div class="ship-col"><div class="ship-wd">${wn}</div><div class="ship-cell${isToday?' today':''}"><div class="ship-date"><span>${ds.slice(5)}</span>${isToday?'<b>今天</b>':''}</div>${chips}<div class="ship-add" title="新增排班" onclick="openShipModal('','${ds}')">+<span class="add-txt"> 排班</span></div></div></div>`;
   }
   html+='</div>';
   const grid=document.getElementById('shipWeekGrid');if(grid)grid.innerHTML=html;
