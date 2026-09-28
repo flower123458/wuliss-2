@@ -218,6 +218,18 @@ tbody tr:last-child td{border-bottom:none}
 .mc-legend em{margin-left:auto;font-style:normal;color:#c99;max-width:70%;text-align:right;line-height:1.5}
 .chart-empty{text-align:center;color:var(--muted);font-size:12px;padding:24px 0}
 .mini-bar>div{height:100%;background:var(--primary);border-radius:4px;min-width:1px}
+.ship-week{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+.ship-wd{text-align:center;font-size:12px;color:var(--muted);padding:6px 0;font-weight:600;border-bottom:1px solid var(--border)}
+.ship-cell{border:1px solid var(--border);border-radius:10px;min-height:130px;padding:8px;display:flex;flex-direction:column;gap:6px;background:var(--card)}
+.ship-cell.today{background:var(--primary-light);border-color:var(--primary)}
+.ship-date{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+.ship-date b{font-size:11px;color:var(--primary);background:#fff;padding:1px 6px;border-radius:8px}
+.ship-chip{font-size:12px;padding:4px 8px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:6px;cursor:pointer;line-height:1.3}
+.ship-x{flex-shrink:0;opacity:.55;font-size:11px}
+.ship-x:hover{opacity:1}
+.ship-add{margin-top:auto;text-align:center;font-size:12px;color:var(--muted);cursor:pointer;border:1px dashed var(--border);border-radius:8px;padding:4px}
+.ship-add:hover{color:var(--primary);border-color:var(--primary)}
+@media(max-width:768px){.ship-week{grid-template-columns:repeat(7,minmax(90px,1fr));overflow-x:auto}}
 </style>
 </head>
 <body>
@@ -476,24 +488,25 @@ tbody tr:last-child td{border-bottom:none}
     <!-- 发货排班页 -->
     <div id="page-shipping" class="page" style="display:none">
       <div class="category-detail-header" id="shipHeader">
-        <div><h1>🚚 发货排班表</h1><p style="font-size:12px;color:var(--muted);margin:4px 0 0">按天安排发货人 · 数据存于本机浏览器（localStorage），后续可接 Supabase 多端同步</p></div>
+        <div><h1>🚚 发货排班表</h1><p style="font-size:12px;color:var(--muted);margin:4px 0 0">按周安排发货人 · 数据存于本机浏览器（localStorage），后续可接 Supabase 多端同步</p></div>
       </div>
       <div class="stats" id="shipKpi"></div>
       <div class="panel">
         <div class="panel-header">
-          <h2>排班明细</h2>
+          <h2>发货排班 · 周视图</h2>
           <div class="panel-actions">
             <div class="filters">
+              <button class="btn btn-outline btn-sm" onclick="shipPrevWeek()">‹ 上周</button>
+              <span id="shipWeekLabel" style="font-size:13px;min-width:140px;text-align:center;display:inline-block"></span>
+              <button class="btn btn-outline btn-sm" onclick="shipThisWeek()">本周</button>
+              <button class="btn btn-outline btn-sm" onclick="shipNextWeek()">下周 ›</button>
               <select id="filterShipAssignee" onchange="renderShipping()"><option value="">全部发货人</option></select>
-              <input type="date" id="filterShipStart" onchange="renderShipping()">
-              <input type="date" id="filterShipEnd" onchange="renderShipping()">
-              <button class="btn btn-outline btn-sm" onclick="resetShipFilter()">重置</button>
             </div>
             <button class="btn btn-outline btn-sm" onclick="exportShipCsv()">⬇️ 导出CSV</button>
             <button class="btn btn-primary" onclick="openShipModal()">➕ 新增排班</button>
           </div>
         </div>
-        <div class="table-wrap"><table><thead><tr><th>排班日期</th><th>星期</th><th>发货人</th><th>备注</th><th class="text-center">操作</th></tr></thead><tbody id="shipBody"></tbody></table></div>
+        <div id="shipWeekGrid"></div>
       </div>
     </div>
 
@@ -1849,10 +1862,15 @@ function logout(){
 /* ===== 发货排班表（localStorage 原型，后续可接 Supabase 多端同步） ===== */
 const SHIP_KEY='wuliss_ship_v2';
 const SHIP_WD=['周日','周一','周二','周三','周四','周五','周六'];
+const SHIP_WD_NAMES=['周一','周二','周三','周四','周五','周六','周日'];
+const SHIP_PERSON_COLORS={'11':{bg:'#E8F0FE',fg:'#1A56C4'},'笋笋':{bg:'#FDF0E6',fg:'#B26A00'},'小碗':{bg:'#E9F7EF',fg:'#1E7E45'}};
+let shipWeekStart='';
 function getShipList(){try{return JSON.parse(localStorage.getItem(SHIP_KEY)||'[]');}catch(e){return [];}}
 function saveShipList(arr){localStorage.setItem(SHIP_KEY,JSON.stringify(arr));}
-function v(id){const e=document.getElementById(id);return e?e.value:'';}
+function fmtYMD(dt){const p=n=>String(n).padStart(2,'0');return `${dt.getFullYear()}-${p(dt.getMonth()+1)}-${p(dt.getDate())}`;}
 function shipWd(d){if(!d)return '—';const dt=new Date(d+'T00:00:00');if(isNaN(dt.getTime()))return '—';return SHIP_WD[dt.getDay()];}
+function shipMondayStr(d){const dt=new Date(d+'T00:00:00');let day=dt.getDay();if(day===0)day=7;dt.setDate(dt.getDate()-(day-1));return fmtYMD(dt);}
+function addDaysStr(d,n){const dt=new Date(d+'T00:00:00');dt.setDate(dt.getDate()+n);return fmtYMD(dt);}
 function updateShipBadge(){const n=getShipList().length;const badge=document.getElementById('nav-shipping');if(badge){badge.textContent=n;badge.style.display=n>0?'':'none';}}
 function renderShipping(){
   const list=getShipList();
@@ -1864,37 +1882,38 @@ function renderShipping(){
     OPERATOR_OPTIONS.forEach(o=>{cards+=`<div class="stat-card"><div class="stat-icon teal">👤</div><div class="stat-info"><div class="label">${escapeHtml(o)} 发货</div><div class="value">${cnt[o]||0}</div><div class="sub">天</div></div></div>`;});
     kpi.innerHTML=cards;
   }
-  const opSel=document.getElementById('filterShipAssignee');
-  const curOp=opSel?opSel.value:'';
-  if(opSel)opSel.innerHTML='<option value="">全部发货人</option>'+OPERATOR_OPTIONS.map(o=>`<option value="${escapeHtml(o)}" ${o===curOp?'selected':''}>${escapeHtml(o)}</option>`).join('');
-  const f={assignee:curOp,start:v('filterShipStart'),end:v('filterShipEnd')};
-  let rows=list.slice();
-  if(f.assignee)rows=rows.filter(s=>s.assignee===f.assignee);
-  if(f.start)rows=rows.filter(s=>(s.date||'')>=f.start);
-  if(f.end)rows=rows.filter(s=>(s.date||'')<=f.end);
-  rows.sort((a,b)=>(a.date||'').localeCompare(b.date||'')||((a.createdAt||0)-(b.createdAt||0)));
-  const body=document.getElementById('shipBody');
-  if(!body)return;
-  if(rows.length===0){body.innerHTML=`<tr><td colspan="5"><div class="empty">暂无排班记录，点右上角「➕ 新增排班」开始</div></td></tr>`;return;}
-  body.innerHTML=rows.map(s=>{
-    const others=getShipList().filter(x=>x.date===s.date&&x.id!==s.id).map(x=>escapeHtml(x.assignee)).join('、');
-    const dayInfo=others?` <span style="font-size:11px;color:var(--muted)">(同天：${others})</span>`:'';
-    return `<tr>
-      <td class="nowrap"><strong>${s.date||'—'}</strong></td>
-      <td class="text-muted">${shipWd(s.date)}</td>
-      <td><strong>${escapeHtml(s.assignee)||'—'}</strong>${dayInfo}</td>
-      <td class="text-muted">${escapeHtml(s.notes)||'—'}</td>
-      <td class="text-center" style="white-space:nowrap"><button class="btn btn-sm btn-outline" onclick="openShipModal('${s.id}')">编辑</button><button class="btn btn-sm btn-outline" style="color:#e05a5a;border-color:#f0c5c5" onclick="deleteShip('${s.id}')">删除</button></td>
-    </tr>`;
-  }).join('');
+  const fOp=document.getElementById('filterShipAssignee');
+  const curOp=fOp?fOp.value:'';
+  if(fOp)fOp.innerHTML='<option value="">全部发货人</option>'+OPERATOR_OPTIONS.map(o=>`<option value="${escapeHtml(o)}" ${o===curOp?'selected':''}>${escapeHtml(o)}</option>`).join('');
+  if(!shipWeekStart)shipWeekStart=shipMondayStr(today());
+  const mon=shipWeekStart,sun=addDaysStr(mon,6),todayStr=today();
+  const lbl=document.getElementById('shipWeekLabel');if(lbl)lbl.textContent=`${mon.slice(5)} ~ ${sun.slice(5)}`;
+  let html='<div class="ship-week">';
+  SHIP_WD_NAMES.forEach(wn=>{html+=`<div class="ship-wd">${wn}</div>`;});
+  for(let i=0;i<7;i++){
+    const ds=addDaysStr(mon,i);
+    const isToday=ds===todayStr;
+    const dayEntries=list.filter(s=>s.date===ds&&(!curOp||s.assignee===curOp));
+    const chips=dayEntries.map(s=>{
+      const c=SHIP_PERSON_COLORS[s.assignee]||{bg:'#eee',fg:'#333'};
+      const note=s.notes?` · ${escapeHtml(s.notes)}`:'';
+      return `<div class="ship-chip" style="background:${c.bg};color:${c.fg}" title="${escapeHtml(s.notes||'')}" onclick="openShipModal('${s.id}')"><span>${escapeHtml(s.assignee)}${note}</span><span class="ship-x" onclick="event.stopPropagation();deleteShip('${s.id}')">✕</span></div>`;
+    }).join('');
+    html+=`<div class="ship-cell${isToday?' today':''}"><div class="ship-date"><span>${ds.slice(5)}</span>${isToday?'<b>今天</b>':''}</div>${chips}<div class="ship-add" onclick="openShipModal('','${ds}')">+ 排班</div></div>`;
+  }
+  html+='</div>';
+  const grid=document.getElementById('shipWeekGrid');if(grid)grid.innerHTML=html;
   updateShipBadge();
 }
-function openShipModal(id){
+function shipPrevWeek(){if(!shipWeekStart)shipWeekStart=shipMondayStr(today());shipWeekStart=addDaysStr(shipWeekStart,-7);renderShipping();}
+function shipNextWeek(){if(!shipWeekStart)shipWeekStart=shipMondayStr(today());shipWeekStart=addDaysStr(shipWeekStart,7);renderShipping();}
+function shipThisWeek(){shipWeekStart=shipMondayStr(today());renderShipping();}
+function openShipModal(id,prefillDate){
   const editing=!!id;
   const item=editing?getShipList().find(s=>s.id===id):null;
   document.getElementById('shipModalTitle').textContent=editing?'编辑排班':'新增发货排班';
   document.getElementById('shipId').value=editing?item.id:'';
-  document.getElementById('shipDate').value=item?item.date||'':today();
+  document.getElementById('shipDate').value=item?item.date||'':(prefillDate||today());
   const defOp=item?item.assignee:(currentOperator||'11');
   const opSel=document.getElementById('shipAssignee');
   opSel.innerHTML=OPERATOR_OPTIONS.map(o=>`<option value="${escapeHtml(o)}" ${o===defOp?'selected':''}>${escapeHtml(o)}</option>`).join('');
@@ -1924,7 +1943,7 @@ function deleteShip(id){
   renderShipping();
   toast('已删除','success');
 }
-function resetShipFilter(){['filterShipAssignee','filterShipStart','filterShipEnd'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});renderShipping();}
+function resetShipFilter(){const e=document.getElementById('filterShipAssignee');if(e)e.value='';renderShipping();}
 function exportShipCsv(){
   const list=getShipList().slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')||((a.createdAt||0)-(b.createdAt||0)));
   if(list.length===0){toast('没有可导出的排班','error');return;}
