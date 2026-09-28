@@ -2012,7 +2012,7 @@ function maybeShowShipRemind(){
   if(scheduled.length===0)return;
   if(localStorage.getItem(shipTodayDoneKey(currentOperator)))return;
   const body=document.getElementById('shipRemindBody');
-  if(body)body.innerHTML=`今天（<b>${todayStr}</b>）轮到 <b style="color:var(--primary)">${escapeHtml(currentOperator)}</b> 发货啦～<br>请记得按时发出今天的订单，发货完成后点击「已发货」即可。`;
+  if(body)body.innerHTML=`今天轮到 <b style="color:var(--primary)">${escapeHtml(currentOperator)}</b> 发货 🚚`;
   const m=document.getElementById('shipRemindModal');
   if(m)m.classList.add('show');
 }
