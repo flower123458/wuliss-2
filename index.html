@@ -1887,14 +1887,38 @@ function logout(){
   location.reload();
 }
 
-/* ===== 发货排班表（localStorage 原型，后续可接 Supabase 多端同步） ===== */
-const SHIP_KEY='wuliss_ship_v2';
+/* ===== 发货排班表（Supabase 多端同步，表 ship_v2） ===== */
+const SHIP_KEY='wuliss_ship_v2'; // 仅用于一次性迁移旧本地数据
 const SHIP_WD=['周日','周一','周二','周三','周四','周五','周六'];
 const SHIP_WD_NAMES=['周一','周二','周三','周四','周五','周六','周日'];
 const SHIP_PERSON_COLORS={'11':{c:'#6C5CE7',soft:'rgba(108,92,231,.14)',text:'#4B3CC2'},'笋笋':{c:'#E8744F',soft:'rgba(232,116,79,.16)',text:'#B8431F'},'小碗':{c:'#18A07A',soft:'rgba(24,160,122,.16)',text:'#0E7156'}};
 let shipWeekStart='';
-function getShipList(){try{return JSON.parse(localStorage.getItem(SHIP_KEY)||'[]');}catch(e){return [];}}
-function saveShipList(arr){localStorage.setItem(SHIP_KEY,JSON.stringify(arr));}
+let shipCache=[];
+let shipLoaded=false;
+let shipWarned=false;
+async function loadShip(){
+  try{
+    const r=await fetch(API_BASE+'/ship_v2?select=*&order=date.asc',{headers:API_HEADERS});
+    if(!r.ok)throw new Error('ship table not ready');
+    shipCache=await r.json()||[];shipLoaded=true;
+  }catch(e){shipCache=[];shipLoaded=false;if(!shipWarned){shipWarned=true;toast('发货排班：数据库未连接，请确认已创建 ship_v2 表','error');}}
+}
+function getShipList(){return shipCache;}
+function shipRowDone(s){return s&&s.done===true;}
+async function migrateShipFromLocal(){
+  try{
+    const raw=localStorage.getItem(SHIP_KEY);if(!raw)return;
+    const legacy=JSON.parse(raw)||[];if(!legacy.length){localStorage.removeItem(SHIP_KEY);return;}
+    const chk=await fetch(API_BASE+'/ship_v2?select=id&limit=1',{headers:API_HEADERS});
+    const ex=await chk.json();
+    if(chk.ok&&(!ex||!ex.length)){
+      const rows=legacy.map(s=>({id:s.id||uid(),date:s.date,assignee:s.assignee,notes:s.notes||'',done:false,created_at:s.createdAt||Date.now(),updated_at:Date.now()}));
+      await fetch(API_BASE+'/ship_v2',{method:'POST',headers:API_HEADERS,body:JSON.stringify(rows)});
+      await loadShip();
+    }
+    localStorage.removeItem(SHIP_KEY);
+  }catch(e){}
+}
 function fmtYMD(dt){const p=n=>String(n).padStart(2,'0');return `${dt.getFullYear()}-${p(dt.getMonth()+1)}-${p(dt.getDate())}`;}
 function shipWd(d){if(!d)return '—';const dt=new Date(d+'T00:00:00');if(isNaN(dt.getTime()))return '—';return SHIP_WD[dt.getDay()];}
 function shipMondayStr(d){const dt=new Date(d+'T00:00:00');let day=dt.getDay();if(day===0)day=7;dt.setDate(dt.getDate()-(day-1));return fmtYMD(dt);}
@@ -1924,7 +1948,7 @@ function renderShipping(){
     const dayEntries=list.filter(s=>s.date===ds&&(!curOp||s.assignee===curOp));
     const chips=dayEntries.map(s=>{
       const c=SHIP_PERSON_COLORS[s.assignee]||{c:'#9aa0a6',soft:'rgba(154,160,166,.18)',text:'#5f6368'};
-      const isDone=s.date===todayStr&&localStorage.getItem(shipTodayDoneKey(s.assignee))==='1';
+      const isDone=s.date===todayStr&&shipRowDone(s);
       const note=s.notes?`<span class="chip-note"> · ${escapeHtml(s.notes)}</span>`:'';
       return `<div class="ship-chip${isDone?' done':''}" style="background:${c.soft};color:${c.text}" title="${isDone?'已完成今日发货':escapeHtml(s.notes||'')}" onclick="event.stopPropagation();openShipModal('${s.id}')"><span class="chip-name">${escapeHtml(s.assignee)}${note}</span>${isDone?'<span class="chip-done" title="已完成">✓</span>':''}<span class="ship-x" onclick="event.stopPropagation();deleteShip('${s.id}')">✕</span></div>`;
     }).join('');
@@ -1950,7 +1974,7 @@ function openShipModal(id,prefillDate){
   document.getElementById('shipNotes').value=item?item.notes||'':'';
   document.getElementById('shipModal').classList.add('show');
 }
-function saveShip(){
+async function saveShip(){
   const id=document.getElementById('shipId').value;
   const data={
     date:document.getElementById('shipDate').value,
@@ -1959,32 +1983,37 @@ function saveShip(){
   };
   if(!data.date){toast('请填写排班日期','error');return;}
   if(!data.assignee){toast('请选择发货人','error');return;}
-  const list=getShipList();
-  if(id){const idx=list.findIndex(s=>s.id===id);if(idx>=0)list[idx]={...list[idx],...data};}
-  else list.push({id:uid(),createdAt:Date.now(),...data});
-  saveShipList(list);
+  try{
+    if(id){
+      await fetch(API_BASE+'/ship_v2?id=eq.'+encodeURIComponent(id),{method:'PATCH',headers:API_HEADERS,body:JSON.stringify({...data,updated_at:Date.now()})});
+    }else{
+      const row={id:uid(),created_at:Date.now(),updated_at:Date.now(),done:false,...data};
+      await fetch(API_BASE+'/ship_v2',{method:'POST',headers:API_HEADERS,body:JSON.stringify(row)});
+    }
+    await loadShip();
+  }catch(e){toast('保存失败，请检查网络或数据库','error');return;}
   closeModal('shipModal');
   renderShipping();
   toast(id?'已更新排班':'已新增排班','success');
 }
-function deleteShip(id){
+async function deleteShip(id){
   if(!confirm('确定删除这条排班记录吗？'))return;
-  saveShipList(getShipList().filter(s=>s.id!==id));
+  try{await fetch(API_BASE+'/ship_v2?id=eq.'+encodeURIComponent(id),{method:'DELETE',headers:API_HEADERS});await loadShip();}catch(e){toast('删除失败','error');return;}
   renderShipping();
   toast('已删除','success');
 }
-function deleteFromModal(){
+async function deleteFromModal(){
   const id=document.getElementById('shipId').value;
   if(!id)return;
   if(!confirm('确定删除这条排班记录吗？'))return;
-  saveShipList(getShipList().filter(s=>s.id!==id));
+  try{await fetch(API_BASE+'/ship_v2?id=eq.'+encodeURIComponent(id),{method:'DELETE',headers:API_HEADERS});await loadShip();}catch(e){toast('删除失败','error');return;}
   closeModal('shipModal');
   renderShipping();
   toast('已删除','success');
 }
 function resetShipFilter(){const e=document.getElementById('filterShipAssignee');if(e)e.value='';renderShipping();}
 function exportShipCsv(){
-  const list=getShipList().slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')||((a.createdAt||0)-(b.createdAt||0)));
+  const list=getShipList().slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')||((a.created_at||0)-(b.created_at||0)));
   if(list.length===0){toast('没有可导出的排班','error');return;}
   const head=['排班日期','星期','发货人','备注'];
   const rows=list.map(s=>[s.date,shipWd(s.date),s.assignee,s.notes].map(x=>`"${String(x==null?'':x).replace(/"/g,'""')}"`).join(','));
@@ -1999,39 +2028,48 @@ function shipTodayCard(){
   const t=today();
   const names=[...new Set(getShipList().filter(s=>s.date===t).map(s=>s.assignee))];
   if(!names.length)return {cls:'orange',icon:'🚚',label:'今日发货',value:'无排班',sub:'今日未安排'};
-  const doneN=names.filter(n=>localStorage.getItem(shipTodayDoneKey(n))==='1').length;
+  const doneN=names.filter(n=>getShipList().some(s=>s.date===t&&s.assignee===n&&shipRowDone(s))).length;
   const sub=doneN>=names.length?'已全部发货 ✓':(doneN>0?`已发货 ${doneN}/${names.length}`:`${names.length}人 · 今日发货`);
   return {cls:'orange',icon:'🚚',label:'今日发货',value:names.join('、'),sub};
 }
-function shipTodayDoneKey(op){return `wuliss_ship_done_${today()}_${op}`;}
 function maybeShowShipRemind(){
   if(!currentOperator)return;
   const todayStr=today();
-  const scheduled=getShipList().filter(s=>s.date===todayStr&&s.assignee===currentOperator);
+  const scheduled=getShipList().filter(s=>s.date===todayStr&&s.assignee===currentOperator&&!shipRowDone(s));
   if(scheduled.length===0)return;
-  if(localStorage.getItem(shipTodayDoneKey(currentOperator)))return;
   const body=document.getElementById('shipRemindBody');
   if(body)body.innerHTML=`今天轮到 <b style="color:var(--primary)">${escapeHtml(currentOperator)}</b> 发货 🚚`;
   const m=document.getElementById('shipRemindModal');
   if(m)m.classList.add('show');
 }
 function closeShipRemind(){const m=document.getElementById('shipRemindModal');if(m)m.classList.remove('show');}
-function markShippedToday(){
-  if(currentOperator)localStorage.setItem(shipTodayDoneKey(currentOperator),'1');
+async function markShippedToday(){
+  if(!currentOperator)return;
+  const t=today();
+  const rows=getShipList().filter(s=>s.date===t&&s.assignee===currentOperator&&!shipRowDone(s));
+  try{
+    for(const s of rows){
+      await fetch(API_BASE+'/ship_v2?id=eq.'+encodeURIComponent(s.id),{method:'PATCH',headers:API_HEADERS,body:JSON.stringify({done:true,updated_at:Date.now()})});
+    }
+    await loadShip();
+  }catch(e){toast('操作失败','error');return;}
   closeShipRemind();
   renderStatsBar();
   renderShipping();
   toast('已完成今日发货 ✓','success');
 }
 
-function initApp(){
+async function initApp(){
   applyCatNavCollapsedState();
   const btnClear=document.getElementById('btnClearAll');
   if(btnClear)btnClear.style.display=isAdmin()?'':'none';
   const navApprove=document.getElementById('navApprove');if(navApprove)navApprove.style.display=isAdmin()?'':'none';
+  await loadShip();
+  await migrateShipFromLocal();
   renderStatsBar();renderCatNav();renderHome();calcPricing();updateShipBadge();
   loadCloudData();
   setInterval(()=>{loadCloudData();},30000);
+  setInterval(()=>{loadShip();updateShipBadge();},30000);
   maybeShowShipRemind();
 }
 
