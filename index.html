@@ -1913,7 +1913,8 @@ async function migrateShipFromLocal(){
     const ex=await chk.json();
     if(chk.ok&&(!ex||!ex.length)){
       const rows=legacy.map(s=>({id:s.id||uid(),date:s.date,assignee:s.assignee,notes:s.notes||'',done:false,created_at:s.createdAt||Date.now(),updated_at:Date.now()}));
-      await fetch(API_BASE+'/ship_v2',{method:'POST',headers:API_HEADERS,body:JSON.stringify(rows)});
+      const mr=await fetch(API_BASE+'/ship_v2',{method:'POST',headers:API_HEADERS,body:JSON.stringify(rows)});
+      if(!mr.ok)return; // 迁移失败则保留本地数据，下次再试
       await loadShip();
     }
     localStorage.removeItem(SHIP_KEY);
@@ -1984,12 +1985,14 @@ async function saveShip(){
   if(!data.date){toast('请填写排班日期','error');return;}
   if(!data.assignee){toast('请选择发货人','error');return;}
   try{
+    let r;
     if(id){
-      await fetch(API_BASE+'/ship_v2?id=eq.'+encodeURIComponent(id),{method:'PATCH',headers:API_HEADERS,body:JSON.stringify({...data,updated_at:Date.now()})});
+      r=await fetch(API_BASE+'/ship_v2?id=eq.'+encodeURIComponent(id),{method:'PATCH',headers:API_HEADERS,body:JSON.stringify({...data,updated_at:Date.now()})});
     }else{
       const row={id:uid(),created_at:Date.now(),updated_at:Date.now(),done:false,...data};
-      await fetch(API_BASE+'/ship_v2',{method:'POST',headers:API_HEADERS,body:JSON.stringify(row)});
+      r=await fetch(API_BASE+'/ship_v2',{method:'POST',headers:API_HEADERS,body:JSON.stringify(row)});
     }
+    if(!r||!r.ok)throw new Error('HTTP '+(r?r.status:'?'));
     await loadShip();
   }catch(e){toast('保存失败，请检查网络或数据库','error');return;}
   closeModal('shipModal');
@@ -1998,7 +2001,7 @@ async function saveShip(){
 }
 async function deleteShip(id){
   if(!confirm('确定删除这条排班记录吗？'))return;
-  try{await fetch(API_BASE+'/ship_v2?id=eq.'+encodeURIComponent(id),{method:'DELETE',headers:API_HEADERS});await loadShip();}catch(e){toast('删除失败','error');return;}
+  try{const r=await fetch(API_BASE+'/ship_v2?id=eq.'+encodeURIComponent(id),{method:'DELETE',headers:API_HEADERS});if(!r.ok)throw new Error('HTTP '+r.status);await loadShip();}catch(e){toast('删除失败','error');return;}
   renderShipping();
   toast('已删除','success');
 }
@@ -2006,7 +2009,7 @@ async function deleteFromModal(){
   const id=document.getElementById('shipId').value;
   if(!id)return;
   if(!confirm('确定删除这条排班记录吗？'))return;
-  try{await fetch(API_BASE+'/ship_v2?id=eq.'+encodeURIComponent(id),{method:'DELETE',headers:API_HEADERS});await loadShip();}catch(e){toast('删除失败','error');return;}
+  try{const r=await fetch(API_BASE+'/ship_v2?id=eq.'+encodeURIComponent(id),{method:'DELETE',headers:API_HEADERS});if(!r.ok)throw new Error('HTTP '+r.status);await loadShip();}catch(e){toast('删除失败','error');return;}
   closeModal('shipModal');
   renderShipping();
   toast('已删除','success');
@@ -2049,7 +2052,8 @@ async function markShippedToday(){
   const rows=getShipList().filter(s=>s.date===t&&s.assignee===currentOperator&&!shipRowDone(s));
   try{
     for(const s of rows){
-      await fetch(API_BASE+'/ship_v2?id=eq.'+encodeURIComponent(s.id),{method:'PATCH',headers:API_HEADERS,body:JSON.stringify({done:true,updated_at:Date.now()})});
+      const r=await fetch(API_BASE+'/ship_v2?id=eq.'+encodeURIComponent(s.id),{method:'PATCH',headers:API_HEADERS,body:JSON.stringify({done:true,updated_at:Date.now()})});
+      if(!r.ok)throw new Error('HTTP '+r.status);
     }
     await loadShip();
   }catch(e){toast('操作失败','error');return;}
